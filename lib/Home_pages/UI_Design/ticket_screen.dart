@@ -8,7 +8,6 @@ import 'package:text_code/Reusable/text_reusable.dart';
 
 class TicketScreen extends StatelessWidget {
   final EventController eventController = Get.find<EventController>();
-  final HostPagesController hostController = Get.find<HostPagesController>();
 
   @override
   Widget build(BuildContext context) {
@@ -62,12 +61,7 @@ class TicketScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Obx(
-                      () => ticketRowStatic(
-                        "Event",
-                        hostController.titleController.text,
-                      ),
-                    ),
+                    Obx(() => ticketRowStatic("Event", eventController.event)),
                     Divider(color: Colors.grey),
                     Obx(() => ticketRow("Venue", eventController.fullLocation)),
                     Divider(color: Colors.grey),
