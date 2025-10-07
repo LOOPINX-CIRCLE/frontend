@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Home_pages/UI_Design/home_page.dart';
 import 'package:text_code/Host_Pages/Controller_files/controller_chooding.dart';
+import 'package:text_code/Host_Pages/Controller_files/detail_controller_file.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Host_Pages/UI_Files/detail_page.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
@@ -113,18 +114,26 @@ class ChoosingTheme extends StatelessWidget {
               () => GestureDetector(
                 onTap: () {
                   if (controller.isActive.value) {
-                    Get.to(() => DetailPage()); // ✅ Navigate with GetX
+                    if (Get.isRegistered<HostPagesController>()) {
+                      Get.delete<HostPagesController>();
+                    }
+                    Get.to(
+                      () => const DetailPage(),
+                      binding: BindingsBuilder(() {
+                        Get.put(HostPagesController());
+                      }),
+                    );
                   }
                 },
-
                 child: Image.asset(
                   controller.isActive.value
-                      ? "assets/images/button/Button Active V2 (2).png" // ✅ Active
-                      : "assets/images/button/Button Active V2 (1).png", // ❌ Inactive
+                      ? "assets/images/button/Button Active V2 (2).png" // Active
+                      : "assets/images/button/Button Active V2 (1).png", // Inactive
                   height: 52,
                 ),
               ),
             ),
+
             SizedBox(height: 50),
           ],
         ),

@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use, avoid_print
+// ignore_for_file: deprecated_member_use, avoid_print, unused_import
 
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -6,7 +6,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Home_pages/Controller/home_page.dart';
 import 'package:text_code/Home_pages/Reusable_card/eventcard.dart';
-import 'package:text_code/Home_pages/UI_Design/ticket_screen.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
 import 'package:text_code/Host_Pages/Controller_files/capicity_cntoller.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
@@ -150,9 +150,6 @@ class _HomePagesState extends State<HomePages> {
                 starImagePath: "assets/icons/Group 1 (6).png",
                 isEnded: true,
                 imagePath: '',
-                onTap: () {
-                  Get.to(() => TicketScreen());
-                },
                 showButton: true,
                 showTwoButtons: true, // 👈 ab Row me 2 button aayenge
                 onFirstButtonTap: () => print("First button tapped ✅"),

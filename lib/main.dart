@@ -16,7 +16,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Get.put(EventController());
-    Get.put(HostPagesController()); // yeh add karo
+    Get.put(HostPagesController());
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       locale: Locale('en'), // Force  English

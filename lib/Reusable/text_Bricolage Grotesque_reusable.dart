@@ -9,7 +9,7 @@ class TextBricolage extends StatelessWidget {
   final FontWeight? fontWeight;
   final TextAlign? textAlign; // 👈 added
 
-  TextBricolage(
+  const TextBricolage(
     this.fontWeight,
     this.text,
     this.fontSize, {

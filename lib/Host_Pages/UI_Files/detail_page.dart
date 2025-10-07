@@ -17,8 +17,15 @@ class DetailPage extends StatefulWidget {
 }
 
 class _DetailPageState extends State<DetailPage> {
-  final HostPagesController controller = Get.put(HostPagesController());
   final EventController eventController = Get.put(EventController());
+  late final HostPagesController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Use Get.put to register and get the controller instance
+    controller = Get.put<HostPagesController>(HostPagesController());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +43,7 @@ class _DetailPageState extends State<DetailPage> {
               child: Icon(Icons.arrow_back, size: 24, color: Colors.white),
             ),
             onPressed: () {
-              controller.resetFields(); // ✅ Reset fields on back
+              // controller.resetFields(); // ✅ Reset fields on back
 
               Get.back();
             },
@@ -446,6 +453,7 @@ class _DetailPageState extends State<DetailPage> {
               color: isDefault ? Colors.grey : Colors.white,
             ),
             decoration: InputDecoration(
+              hintText: "Event name",
               hintStyle: const TextStyle(color: Colors.white54),
               filled: true,
               fillColor: const Color(0xFF1E1E1E),

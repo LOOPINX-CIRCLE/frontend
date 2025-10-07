@@ -4,7 +4,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:text_code/Home_pages/UI_Design/ticket_screen.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_price_screen.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
 
 class EventCardsController extends GetxController {
   var isEnded = false.obs;
@@ -255,7 +256,13 @@ class _InviteEventCardState extends State<InviteEventCard> {
                                     Expanded(
                                       child: GestureDetector(
                                         onTap: () {
-                                          Get.to(() => TicketScreen());
+                                          if (widget.price != null) {
+                                            //  Navigate to payment screen if price is available
+                                            Get.to(() => TicketPriceScreen());
+                                          } else {
+                                            //  Navigate to ticket or event screen if no price
+                                            Get.to(() => TicketScreen());
+                                          }
                                         },
                                         child: Container(
                                           height: 56,
@@ -269,8 +276,7 @@ class _InviteEventCardState extends State<InviteEventCard> {
                                             child: Text(
                                               widget.price != null
                                                   ? "${widget.firstButtonText} ₹ ${widget.price}" // agar price ho to
-                                                  : widget
-                                                        .firstButtonText, // default sirf Going!
+                                                  : widget.firstButtonText,
                                               style:
                                                   GoogleFonts.bricolageGrotesque(
                                                     color: Colors.white,

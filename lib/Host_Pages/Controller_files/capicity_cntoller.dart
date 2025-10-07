@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
-import 'package:text_code/Reusable/navigation_bar.dart';
 
 class CapacityController extends GetxController {
   // ------------------- Inject EventController -------------------
