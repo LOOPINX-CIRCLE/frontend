@@ -1,3 +1,8 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "dart.flutterRunAdditionalArgs": [
+        "--web-port=64233"
+    ],
+    "dart.flutterWebAdditionalArgs": [
+        "--web-port=64233"
+    ]
 }

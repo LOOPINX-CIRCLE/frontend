@@ -15,14 +15,15 @@ class EventController extends GetxController {
   var mainLocationName = "".obs;
   var latitude = 0.0.obs;
   var longitude = 0.0.obs;
+  var eventImage = "".obs; // Event image for tickets
 
-  /// ✅ Getter: Date + Time ek sath
+  // Getter: Date + Time ek sath
   String get dateTime => "${date.value} ${time.value}";
   String get Price => " ${ticketPrice.value}";
   String get event => " ${experienceType.value}";
   String get fullLocation => "${loaction.value} ";
 
-  /// ✅ Reset method (sab values clear ho jayengi)
+  // Reset method (sab values clear ho jayengi)
   void resetEventData() {
     experienceType.value = "";
     eventTitle.value = "";

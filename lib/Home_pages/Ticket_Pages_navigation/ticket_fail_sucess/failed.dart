@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Home_pages/UI_Design/home_page.dart';
-import 'package:text_code/Reusable/customer_appbar.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
 import 'package:text_code/Reusable/text_reusable.dart';
 
@@ -12,75 +12,102 @@ class Failed extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: CustomAppBar(
-        leadingIcon: Padding(
-          padding: const EdgeInsets.only(left: 20), // 👈 left se gap
-          child: Image.asset(
-            "assets/icons/Back Icon.png",
-            height: 60,
-            // width: 40,
-          ),
-        ),
-        titleWidget: FormLabel("Payment failed", fontSize: 22),
-      ),
-      // appBar: AppBar(
-      //   backgroundColor: Colors.black,
-      //   title: Row(
-      //     // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      //     children: [
-      //       Image.asset("assets/icons/Back Icon.png", height: 40),
-      //       SizedBox(width: 100),
-      //       FormLabel("Payment failed", fontSize: 22),
-      //     ],
-      //   ),
-      // ),
-      body: Column(
-        // mainAxisAlignment: MainAxisAlignment.center,
-        // crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(height: 100),
-          Image.asset("assets/icons/iconpaym.png", height: 200, width: 200),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Expanded(
-              child: Center(
-                child: TextBricolage(
-                  FontWeight.w500,
-                  "Payment Could Not Be Completed",
-                  26,
-                  textAlign: TextAlign.center, // 👈 text ko beech me karega
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Back button and heading aligned - margin 31 from top
+              Padding(
+                padding: const EdgeInsets.only(top: 31, left: 16, right: 16),
+                child: Row(
+                  children: [
+                    // Back button
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Image.asset(
+                          "assets/icons/Back Icon.png",
+                          height: 24,
+                          width: 24,
+                        ),
+                      ),
+                    ),
+                    // Payment failed heading - centered
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          "Payment failed",
+                          style: GoogleFonts.bricolageGrotesque(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Spacer to balance the back button
+                    const SizedBox(width: 40),
+                  ],
                 ),
               ),
-            ),
-          ),
-          SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black, // 🔹 Button background
-              foregroundColor: Colors.white, // 🔹 Text/Icon color
-              side: const BorderSide(
-                color: Colors.grey,
-                width: 1,
-              ), // 🔹 Border color
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  8,
-                ), // optional: rounded corners
+              // Margin 250, then image
+              const SizedBox(height: 80),
+              Center(
+                child: Image.asset("assets/icons/iconpaym.png"),
               ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-              child: TextBricolage(FontWeight.w500, "Try Again", 18),
-            ),
+              // Keep Try Again and Go Back buttons same
+              const SizedBox(height: 30),
+              Center(
+                child: GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color.fromRGBO(40, 40, 40, 1.0), // Lighter gray at top
+                          Color.fromRGBO(20, 20, 20, 1.0), // Darker gray in middle
+                          Colors.black, // Black at bottom
+                        ],
+                      
+                        stops: [0.0, 0.5, 1.0],
+                      ),
+                      border: Border.all(color: Colors.grey, width: 1.0),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      child: Text(
+                        "Try Again",
+                        style: GoogleFonts.bricolageGrotesque(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    Get.to(() => HomePages());
+                  },
+                  child: FormLabel("Go Back", fontSize: 16),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Get.to(() => HomePages()); // 🔹 Example: HomePage par navigate
-            },
-            child: FormLabel("Go Back", fontSize: 16),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:text_code/Home_pages/UI_Design/home_page.dart';
+import 'package:text_code/Home_pages/UI_Design/home_with_tabs.dart';
 import 'package:text_code/Host_Pages/UI_Files/main_host_page.dart';
+import 'package:text_code/login-signup/sign_up/booked_ticket.dart';
+import 'package:text_code/profilePage/profile.dart';
 
 class TicketController extends GetxController {
   RxBool showBeautyQueen = false.obs;
@@ -14,7 +17,8 @@ class TicketController extends GetxController {
 }
 
 class BottomBar extends StatefulWidget {
-  const BottomBar({super.key});
+  final int initialIndex;
+  const BottomBar({super.key, this.initialIndex = 0});
 
   @override
   _BottomBarState createState() => _BottomBarState();
@@ -30,6 +34,7 @@ class _BottomBarState extends State<BottomBar> {
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _selectedIndex = widget.initialIndex;
   }
 
   @override
@@ -42,33 +47,15 @@ class _BottomBarState extends State<BottomBar> {
     'assets/icons/Homes.png',
     'assets/icons/Stars.png',
     'assets/icons/Crown Line.png',
-    'assets/icons/Bell.png',
     "assets/icons/User.png",
   ];
 
-  final List<String> _labels = ["Home", "Wall", "Host", "Notify", "Profile"];
+  final List<String> _labels = ["Home", "Discover", "Host", "Profile"];
   List<Widget> get _screens => [
-    HomePages(),
-    Center(
-      child: Text(
-        "Coming Soon",
-        style: TextStyle(color: Colors.white, fontSize: 24),
-      ),
-    ),
+    const HomeWithTabs(initialTab: 0), // Home icon shows HomeWithTabs with Discover tab
+    const HomeWithTabs(initialTab: 0), // Star icon (Discover) shows HomeWithTabs with Discover tab
     MainHostPage(),
-
-    Center(
-      child: Text(
-        "Coming Soon",
-        style: TextStyle(color: Colors.white, fontSize: 24),
-      ),
-    ),
-    Center(
-      child: Text(
-        "Coming Soon",
-        style: TextStyle(color: Colors.white, fontSize: 24),
-      ),
-    ),
+    ProfilePage(hasHomePagesAccess: true), // Profile page with dynamic photos - user has HomePages access
   ];
 
   Widget _getBody() => _screens[_selectedIndex];

@@ -4,15 +4,24 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:text_code/Home_pages/Controller/home_page.dart';
-import 'package:text_code/Home_pages/Reusable_card/eventcard.dart';
+import 'package:text_code/Reusable/eventcard.dart';
 import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
 import 'package:text_code/Host_Pages/Controller_files/capicity_cntoller.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
+import 'package:text_code/Reusable/navigation_bar.dart';
+import 'package:text_code/Reusable/loopin_cta_button.dart';
+import 'package:text_code/Home_pages/UI_Design/eventdetail.dart';
+import 'package:text_code/HostManagement/mainScreen.dart';
 
 class HomePages extends StatefulWidget {
-  const HomePages({super.key});
+  const HomePages({super.key, this.showTabs = true, this.tabIndex, this.onTabChanged});
+
+  final bool showTabs;
+  final int? tabIndex;
+  final Function(int)? onTabChanged;
 
   @override
   State<HomePages> createState() => _HomePagesState();
@@ -32,6 +41,13 @@ class _HomePagesState extends State<HomePages> {
     print("Image tapped!");
   }
 
+  // Helper method to get date 48 hours before today
+  String _getDate48HoursBefore() {
+    final now = DateTime.now();
+    final date48HoursBefore = now.subtract(const Duration(hours: 48));
+    return DateFormat('d MMM yy').format(date48HoursBefore);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -44,12 +60,9 @@ class _HomePagesState extends State<HomePages> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(top: 10),
-          child: Column(
+    final content = SingleChildScrollView(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
             children: [
               Obx(
                 () => InkWell(
@@ -97,29 +110,61 @@ class _HomePagesState extends State<HomePages> {
                   ),
                 ),
               ),
-              SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.only(left: 24),
-                child: Row(
-                  children: [
-                    buildTabButton(0, "Discover"),
-                    const SizedBox(width: 10),
-                    buildTabButton(1, "My tickets"),
-                  ],
+              if (widget.showTabs) ...[
+                SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.only(left: 24),
+                  child: Row(
+                    children: [
+                      buildTabButton(0, "Discover"),
+                      const SizedBox(width: 10),
+                      buildTabButton(1, "My tickets"),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(height: 20),
+                SizedBox(height: 20),
+              ] else if (widget.tabIndex != null && widget.onTabChanged != null) ...[
+                SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.only(left: 24),
+                  child: Row(
+                    children: [
+                      _buildTabButton(0, "Discover"),
+                      const SizedBox(width: 10),
+                      _buildTabButton(1, "Ticket"),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 20),
+              ] else
+                SizedBox(height: 20),
               InviteEventCard(
                 badgeText: "",
                 imageUrls: ["assets/images/image (2).png"],
-                title: "Astro night",
-                dateLocation: "7 Jun 25, Bastian garden city",
+                title: "DiwaNight",
+                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
                 hostName: "Anya",
                 starImagePath: "assets/icons/Group 1 (2).png",
                 isEnded: false,
                 status: EventStatus.hostedByCurrentUser,
                 imagePath: 'assets/images/button/Frame 19976 (3).png',
-                onTap: () {},
+                buttonLabel: "View Request",
+                buttonVariant: LoopinButtonVariant.primary,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MainScreen(
+                        eventName: "DiwaNight",
+                        eventPrice: "₹499",
+                        confirmedUsers: 34,
+                        invitedCount: 10, // Set to > 0 to see invited list
+                        requestsCount: 10, // Set to > 0 to see requests list
+                        checkInCount: 3, // Set to > 0 to see check-in list
+                      ),
+                    ),
+                  );
+                },
               ),
               InviteEventCard(
                 badgeText: "New Event",
@@ -130,10 +175,38 @@ class _HomePagesState extends State<HomePages> {
                 starImagePath: "assets/icons/Group 1 (2).png",
                 isEnded: true,
                 imagePath: 'assets/images/button/Frame 19976 (4).png',
-                // onTap: () {
-                //   controllerbut.changeImage("assets/images/button/button.png");
-                //   // Get.to(() => const DetailsPage(title: "F1 Night"));
-                // },
+                buttonLabel: "Send Request",
+                buttonVariant: LoopinButtonVariant.primary,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                        title: "Astro night",
+                        date: "Sunday 25, September 2009",
+                        time: "7:30 PM onwards",
+                        hostName: "Anya Dangwal",
+                        hostImage: "assets/images/ananya.png",
+                        eventImage: "assets/images/image (2).png",
+                        venue: "Bastian Garden City",
+                        fullAddress: "Basque Garden project, Mussoorie Rd, near Dehradun Zoo, Salan Gaon, Mahi, Dehradun, Guniyal Gaon, Uttarakhand 248001",
+                        aboutEvent: "SIP CLUB POP-UP: DISCO DREAM\n\nWednesday, 18th June | Bastian Garden City\nHosted by Pragya Mishra & Vrithi Manjeshwar\nTheme: Silver-Coded & Blinged to Perfection\n\nBrace yourself.\n\nStep into a mirrorball fantasy where every surface catches light and every moment sparkles with possibility. This isn't just an event—it's a portal to the most exclusive night of your life.\n\nTHE NIGHT:\n• Sequins in motion.\n• Crystals catching strobe flashes.\n• High-gloss glamour with no dimmer switch.\n• This is where the who's-who shows up and shows off.\n\nTHE SOUND:\nOn the decks - DJ GANESH, India's most iconic wedding DJ, teaming up with Yudi for an unforgettable musical journey.",
+                        badgeText: "New Event",
+                        attendeesCount: 24,
+                        attendeeImages: [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                        ],
+                        isGoing: false,
+                        price: "₹499",
+                        starImagePath: "assets/icons/Group 1 (2).png",
+                      ),
+                    ),
+                  );
+                },
                 showButton: true,
                 showTwoButtons: true, // 👈 ab Row me 2 button aayenge
                 price:
@@ -145,11 +218,39 @@ class _HomePagesState extends State<HomePages> {
                 badgeText: "  New Invite   ",
                 imageUrls: ["assets/images/image (4).png"],
                 title: "Nirvaan",
-                dateLocation: "7 Jun 25, Bastian garden city",
+                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
                 hostName: "Senan",
                 starImagePath: "assets/icons/Group 1 (6).png",
                 isEnded: true,
                 imagePath: '',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                        title: "Nirvaan",
+                        date: "Saturday 7, June 2025",
+                        time: "8:00 PM onwards",
+                        hostName: "Senan",
+                        hostImage: "assets/images/avatar.png",
+                        eventImage: "assets/images/image (4).png",
+                        venue: "Bastian Garden City",
+                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
+                        aboutEvent: "Join us for an amazing evening at Nirvaan event. Experience the best of entertainment and networking in a beautiful setting.",
+                        badgeText: "  New Invite   ",
+                        attendeesCount: 15,
+                        attendeeImages: [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                        ],
+                        isGoing: false,
+                        price: "₹300",
+                        starImagePath: "assets/icons/Group 1 (6).png",
+                      ),
+                    ),
+                  );
+                },
                 showButton: true,
                 showTwoButtons: true, // 👈 ab Row me 2 button aayenge
                 onFirstButtonTap: () => print("First button tapped ✅"),
@@ -159,26 +260,86 @@ class _HomePagesState extends State<HomePages> {
                 badgeText: "New Event",
                 imageUrls: ["assets/images/image (2).png"],
                 title: "Astro night",
-                dateLocation: "7 Jun 25, Bastian garden city",
+                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
                 hostName: "Anya",
                 starImagePath: "assets/icons/Group 1 (2).png",
                 isEnded: true,
                 imagePath: 'assets/images/button/Frame 19976 (4).png',
+                buttonLabel: "Send Request",
+                buttonVariant: LoopinButtonVariant.primary,
+
                 onTap: () {
-                  controllerbut.changeImage("assets/images/button/button.png");
-                  // Get.to(() => const DetailsPage(title: "F1 Night"));
+                  // "New Event" single button - opens EventDetail with "Send Request" button
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                        title: "Astro night",
+                        date: "Sunday 25, September 2009",
+                        time: "7:30 PM onwards",
+                        hostName: "Anya Dangwal",
+                        hostImage: "assets/images/ananya.png",
+                        eventImage: "assets/images/image (2).png",
+                        venue: "Bastian Garden City",
+                        fullAddress: "Basque Garden project,Dehradun,",
+                        aboutEvent: "SIP CLUB POP-UP: DISCO DREAM\n\nWednesday, 18th June | Bastian Garden City\nHosted by Pragya Mishra & Vrithi Manjeshwar\nTheme: Silver-Coded & Blinged to Perfection\n\nBrace yourself.\n\nStep into a mirrorball fantasy where every surface catches light and every moment sparkles with possibility. This isn't just an event—it's a portal to the most exclusive night of your life.\n\nTHE NIGHT:\n• Sequins in motion.\n• Crystals catching strobe flashes.\n• High-gloss glamour with no dimmer switch.\n• This is where the who's-who shows up and shows off.\n\nTHE SOUND:\nOn the decks - DJ GANESH, India's most iconic wedding DJ, teaming up with Yudi for an unforgettable musical journey.",
+                        badgeText: "New Event",
+                        attendeesCount: 24,
+                        attendeeImages: [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                        ],
+                        isGoing: false,
+                        price: null, // No price for single button "New Event" - will show "Send Request" button
+                        starImagePath: "assets/icons/Group 1 (2).png",
+                      ),
+                    ),
+                  );
                 },
               ),
               InviteEventCard(
                 badgeText: "You're Going",
-                imageUrls: ["assets/images/image (1).png"],
+                imageUrls: ["assets/images/gameNight.png"],
                 title: "F1 night",
-                dateLocation: "7 Jun 25, Bastian garden city",
+                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
                 hostName: "Anya",
                 isEnded: false,
                 imagePath: 'assets/images/button/Frame 19976 (2).png',
+                buttonLabel: "View Ticket",
+                buttonVariant: LoopinButtonVariant.primary,
                 status: EventStatus.attending, // 👈 Pass the status here
-                onTap: () {},
+                onTap: () {
+                  // Navigate to EventDetail - will show single button that opens BookedTicket
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                        title: "F1 night",
+                        date: "Saturday 7, June 2025",
+                        time: "8:00 PM onwards",
+                        hostName: "Anya",
+                        hostImage: "assets/images/ananya.png",
+                        eventImage: "assets/images/gameNight.png",
+                        venue: "Bastian Garden City",
+                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
+                        aboutEvent: "Join us for an exciting F1 night event. Experience the thrill of Formula 1 racing in a unique setting with fellow racing enthusiasts.",
+                        badgeText: "You're Going",
+                        attendeesCount: 20,
+                        attendeeImages: [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                        ],
+                        isGoing: true,
+                        price: null, // No price for "You're Going" badge
+                        starImagePath: "assets/icons/Group 1 (5).png",
+                      ),
+                    ),
+                  );
+                },
                 starImagePath: "assets/icons/Group 1 (5).png",
               ),
 
@@ -186,32 +347,95 @@ class _HomePagesState extends State<HomePages> {
                 badgeText: "Event Has Ended",
                 imageUrls: ["assets/images/image (3).png"],
                 title: "SunSet Sip",
-                dateLocation: "7 Jun 25, Bastian garden city",
+                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
                 hostName: "Senan",
                 starImagePath: "assets/icons/Group 1 (3).png",
                 isEnded: true,
                 imagePath: '',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                        title: "SunSet Sip",
+                        date: "Friday 6, June 2025",
+                        time: "6:00 PM onwards",
+                        hostName: "Senan",
+                        hostImage: "assets/images/avatar.png",
+                        eventImage: "assets/images/image (3).png",
+                        venue: "Bastian Garden City",
+                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
+                        aboutEvent: "A beautiful sunset event that has now ended. Thank you to all who attended this memorable evening.",
+                        badgeText: "Event Has Ended",
+                        attendeesCount: 45,
+                        attendeeImages: [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                        ],
+                        isGoing: false,
+                        price: "₹200",
+                        starImagePath: "assets/icons/Group 1 (3).png",
+                      ),
+                    ),
+                  );
+                },
                 showButton: false,
               ),
               InviteEventCard(
                 badgeText: "Deadline Has Passed",
                 imageUrls: ["assets/images/image (4).png"],
                 title: "Nirvaan",
-                dateLocation: "7 Jun 25, Bastian garden city",
+                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
                 hostName: "Senan",
                 starImagePath: "assets/icons/Group 1 (4).png",
                 isEnded: true,
                 imagePath: '',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                        title: "Nirvaan",
+                        date: "Saturday 7, June 2025",
+                        time: "8:00 PM onwards",
+                        hostName: "Senan",
+                        hostImage: "assets/images/avatar.png",
+                        eventImage: "assets/images/image (4).png",
+                        venue: "Bastian Garden City",
+                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
+                        aboutEvent: "This event's registration deadline has passed. Unfortunately, you can no longer register for this event.",
+                        badgeText: "Deadline Has Passed",
+                        attendeesCount: 30,
+                        attendeeImages: [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                        ],
+                        isGoing: false,
+                        price: "₹400",
+                        starImagePath: "assets/icons/Group 1 (4).png",
+                      ),
+                    ),
+                  );
+                },
                 showButton: false,
               ),
               SizedBox(height: 60),
             ],
           ),
-        ),
-      ),
     );
+
+    if (widget.showTabs) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: content,
+        ),
+      );
+    } else {
+      return content;
+    }
   }
 
   Widget buildTabButton(int index, String label) {
@@ -221,6 +445,12 @@ class _HomePagesState extends State<HomePages> {
         setState(() {
           selectedIndex = index;
         });
+        if (label == "My tickets" && widget.showTabs) {
+          // Switch to bottom bar's My tickets tab
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const BottomBar(initialIndex: 1)),
+          );
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -238,6 +468,36 @@ class _HomePagesState extends State<HomePages> {
           style: GoogleFonts.poppins(
             fontSize: 14,
             color: isSelected ? Colors.white : Colors.grey,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabButton(int index, String label) {
+    final bool isSelected = widget.tabIndex == index;
+    return GestureDetector(
+      onTap: () {
+        widget.onTabChanged?.call(index);
+      },
+      child: Container(
+        width: 136,
+        height: 45,
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(21),
+          border: Border.all(
+            color: const Color.fromRGBO(255, 255, 255, 0.07),
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: isSelected ? Colors.white : Colors.grey,
+            ),
           ),
         ),
       ),

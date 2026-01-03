@@ -32,7 +32,6 @@ class ChoosingTheme extends StatelessWidget {
             ),
             onPressed: () {
               controller.resetSelection();
-              eventController.resetEventData(); // ✅ Event reset
 
               Get.back();
             },
@@ -45,7 +44,6 @@ class ChoosingTheme extends StatelessWidget {
               icon: Icon(Icons.close, color: Colors.white),
               onPressed: () {
                 controller.resetSelection();
-                eventController.resetEventData(); // ✅ Event reset
 
                 HomePages();
               },
