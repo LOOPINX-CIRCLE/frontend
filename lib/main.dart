@@ -7,7 +7,7 @@ import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Host_Pages/UI_Files/choosing_theme.dart';
 import 'package:text_code/splashscreen.dart';
-import 'package:text_code/profilePage/profile.dart';
+// import 'package:text_code/profilePage/profile.dart';
 import 'package:text_code/profilePage/profile_controller.dart';
 import 'package:text_code/waitHomePage/waitHome.dart';
 
@@ -37,13 +37,9 @@ class MainApp extends StatelessWidget {
       defaultTransition: Transition.fadeIn, // Global fade-in transition for all pages
       transitionDuration: const Duration(milliseconds: 300),
       getPages: [
-
-        // GetPage(name: '/', page: () => BottomBar()),
-        // GetPage(name: '/choosing_theme', page: () => ChoosingTheme()),
-
         GetPage(name: '/', page: () => SplashScreen()),
-        // GetPage(name: '/home', page: () => BottomBar()),
-        // GetPage(name: '/choosing_theme', page: () => ChoosingTheme()),
+        GetPage(name: '/choosing_theme', page: () => ChoosingTheme()),
+        GetPage(name: '/home', page: () => BottomBar()),
       ],
     );
   }

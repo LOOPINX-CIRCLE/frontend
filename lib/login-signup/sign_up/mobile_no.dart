@@ -63,6 +63,10 @@ class _MobileNoState extends State<MobileNo> {
     });
 
     try {
+      // Clear any existing token before starting new signup flow
+      // This ensures we don't use stale tokens from previous sessions
+      await _authService.logout();
+      
       // Call send OTP API
       await _authService.sendOTP(
         phoneNumber: digitsOnly,

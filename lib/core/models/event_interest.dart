@@ -8,7 +8,7 @@ class EventInterest {
   EventInterest({
     required this.id,
     required this.name,
-    required this.description,
+    this.description = '', // Make description optional with default empty string
   });
 
   /// Creates an EventInterest from JSON
@@ -16,7 +16,7 @@ class EventInterest {
     return EventInterest(
       id: json['id'] is int ? json['id'] as int : int.parse(json['id'].toString()),
       name: json['name'] as String,
-      description: json['description'] as String,
+      description: json['description'] as String? ?? '', // Handle null description
     );
   }
 

@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:convert';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
@@ -70,6 +69,59 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
       return;
     }
 
+    // Validate all required fields are present
+    final userController = Get.find<UserController>();
+    
+    if (userController.userName.value.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Name is required. Please go back and enter your name.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (userController.birthDate.value.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Birth date is required. Please go back and enter your birth date.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (userController.gender.value.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Gender is required. Please go back and select your gender.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (userController.eventInterests.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Event interests are required. Please go back and select your interests.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    if (userController.mobileNumber.value.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Phone number is required. Please start over.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Show loading indicator
     showDialog(
       context: context,
@@ -80,7 +132,6 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
     );
 
     try {
-      final userController = Get.find<UserController>();
       final authService = AuthService();
       
       // Get token
@@ -92,59 +143,66 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         );
       }
 
-      // Process selected images
-      // The API requires valid HTTP/HTTPS URLs, but we need to send at least 1 image
-      // For now, we'll use placeholder URLs or try base64 format
-      // TODO: Implement proper image upload endpoint to get real URLs
-      final List<String> imageUrls = [];
-      
+      // Collect all selected image bytes and filenames
+      final List<Map<String, dynamic>> imageData = [];
       for (var i = 0; i < _selectedImages.length; i++) {
         if (_selectedImages[i] != null && _imageBytes[i] != null) {
-          // Option 1: Try using base64 data URL (API might accept it despite validation error)
-          // Option 2: Use placeholder URL format that looks valid
-          // Option 3: Upload to server first (requires upload endpoint)
+          // Get filename from file path or use default
+          // On web, File.path might not work, so we use a default name
+          String filename = 'image_$i.jpg';
+          try {
+            if (_selectedImages[i] != null) {
+              final path = _selectedImages[i]!.path;
+              if (path.isNotEmpty) {
+                final pathParts = path.split('/');
+                if (pathParts.isNotEmpty) {
+                  filename = pathParts.last;
+                  // Ensure filename has extension
+                  if (!filename.contains('.')) {
+                    filename = '$filename.jpg';
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // On web or if path is not available, use default filename
+            filename = 'image_$i.jpg';
+          }
           
-          // For now, using base64 data URL - API validation might be lenient
-          // If this fails, we'll need to implement image upload endpoint first
-          final base64Image = base64Encode(_imageBytes[i]!);
-          imageUrls.add('data:image/jpeg;base64,$base64Image');
+          imageData.add({
+            'bytes': _imageBytes[i]!,
+            'filename': filename,
+          });
         }
       }
 
       // Check if we have at least one image (API requirement)
-      if (imageUrls.isEmpty) {
+      if (imageData.isEmpty) {
         throw ApiException(
           message: 'Please select at least one profile picture',
           statusCode: 400,
         );
       }
 
-      // Save profile pictures to UserController
-      userController.setProfilePictures(imageUrls);
-
-      // Prepare payload with proper formatting
-      final payload = <String, dynamic>{
-        'phone_number': userController.fullMobileNumber, // Already formatted with country code
-        'name': userController.userName.value.trim(),
-        'birth_date': userController.formattedBirthDate, // YYYY-MM-DD format
-        'gender': userController.formattedGender, // lowercase: male, female, other
-        'event_interests': userController.eventInterests.toList(), // Array of integers
-        'profile_pictures': imageUrls, // Array of image URLs/data URLs
-      };
-
       if (kDebugMode) {
-        print('Complete profile payload: $payload');
-        print('Birth date (formatted): ${userController.formattedBirthDate}');
+        print('=== Complete Profile Data ===');
+        print('Phone: ${userController.fullMobileNumber}');
+        print('Name: ${userController.userName.value.trim()}');
+        print('Birth Date (formatted): ${userController.formattedBirthDate}');
         print('Gender (formatted): ${userController.formattedGender}');
-        print('Event interests: ${userController.eventInterests.toList()}');
-        print('Profile pictures count: ${imageUrls.length}');
-        print('Profile pictures: ${imageUrls.isEmpty ? "Empty array" : "Has ${imageUrls.length} URLs"}');
+        print('Event Interests: ${userController.eventInterests.toList()}');
+        print('Profile Pictures: ${imageData.length} file(s)');
       }
 
-      // Call complete profile API
-      final response = await authService.completeProfile(
+      // Call complete profile API with multipart upload
+      final response = await authService.completeProfileMultipart(
         token: token,
-        payload: payload,
+        phoneNumber: userController.fullMobileNumber,
+        name: userController.userName.value.trim(),
+        birthDate: userController.formattedBirthDate,
+        gender: userController.formattedGender,
+        eventInterests: userController.eventInterests.toList(),
+        profilePictures: imageData,
       );
 
       if (!mounted) return;
@@ -154,6 +212,13 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
 
       // Check if successful
       if (response['success'] == true) {
+        // Profile completion successful
+        // Token is already saved from OTP verification
+        // Clear any cached profile data to force fresh fetch
+        if (kDebugMode) {
+          print('Profile completed successfully. Token should be current.');
+        }
+        
         // Navigate to home
         Navigator.pushReplacement(
           context,
