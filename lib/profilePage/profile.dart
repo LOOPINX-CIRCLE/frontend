@@ -11,7 +11,6 @@ import 'profile_controller.dart';
 import 'termsCondition.dart';
 import 'PrivacyPolicy.dart';
 
-
 class ProfilePage extends StatefulWidget {
   final bool hasHomePagesAccess;
   const ProfilePage({super.key, this.hasHomePagesAccess = true});
