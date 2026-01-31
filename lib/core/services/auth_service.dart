@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:text_code/core/network/api_client.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
 import 'package:text_code/core/models/event_interest.dart';
 import 'package:text_code/core/models/user_profile.dart';
 import 'package:text_code/core/constants/api_constants.dart';
+import 'package:text_code/profilePage/profile_controller.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 
@@ -103,7 +106,20 @@ class AuthService {
         final token = response['token'] as String;
         // Store token securely
         await _secureStorage.saveToken(token);
-       
+
+        // Fetch and cache profile immediately after login
+        try {
+          final profile = await fetchProfile();
+          // Cache in ProfileController if available
+          final profileController = Get.isRegistered<ProfileController>()
+              ? Get.find<ProfileController>()
+              : null;
+          profileController?.setProfile(profile);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Failed to cache profile after login: $e');
+          }
+        }
       } else if (response['success'] == false) {
         // Handle failure cases (expired OTP, invalid OTP, etc.)
         final errorMessage = response['message']?.toString() ?? 'OTP verification failed';
@@ -115,7 +131,7 @@ class AuthService {
       }
 
       return response;
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     }
   }
@@ -164,7 +180,7 @@ class AuthService {
           error: response,
         );
       }
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
@@ -204,21 +220,21 @@ class AuthService {
         },
       );
 
+      // Debug: Print raw API response for troubleshooting
+      print('DEBUG: Raw /auth/profile response:');
+      print(response);
       if (kDebugMode) {
         print('Profile response: $response');
       }
 
-      // Parse response
-      if (response['success'] == true && response['data'] != null) {
+      // Parse response: handle both wrapped and direct profile data
+      if (response.containsKey('data') && response['data'] is Map<String, dynamic>) {
         return UserProfile.fromJson(response['data'] as Map<String, dynamic>);
       } else {
-        throw ApiException(
-          message: response['message']?.toString() ?? 'Failed to fetch profile',
-          statusCode: response['statusCode'] ?? 400,
-          error: response,
-        );
+        // Direct profile data (no 'data' wrapper)
+        return UserProfile.fromJson(response);
       }
-    } on ApiException catch (e) {
+        } on ApiException {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
@@ -336,9 +352,9 @@ class AuthService {
         }
       }
 
-      if (files.isEmpty) {
+      if (files.length < 4) {
         throw ApiException(
-          message: 'At least one profile picture is required',
+          message: 'At least 4 profile pictures are required',
           statusCode: 400,
         );
       }
@@ -391,7 +407,7 @@ class AuthService {
       }
 
       return response;
-    } on ApiException catch (e) {
+    } on ApiException {
       // Re-throw ApiException with readable message
       rethrow;
     } catch (error) {
@@ -464,7 +480,7 @@ class AuthService {
       }
 
       return response;
-    } on ApiException catch (e) {
+    } on ApiException {
       // Re-throw ApiException with readable message
       rethrow;
     } catch (error) {
@@ -480,7 +496,12 @@ class AuthService {
 
   /// Get stored token (for external use if needed)
   Future<String?> getStoredToken() async {
-    return await _secureStorage.getToken();
+    final token = await _secureStorage.getToken();
+    if (kDebugMode) {
+      print('JWT Token: '
+          '${token ?? "(null)"}');
+    }
+    return token;
   }
 
   /// Clear stored token (logout)

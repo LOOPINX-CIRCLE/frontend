@@ -25,7 +25,7 @@ class User {
 
 class TabContentUI {
   // Hardcoded user lists for each tab
-  static List<User> _invitedUsers = [
+  static final List<User> _invitedUsers = [
     User(id: '1', name: 'Clara', imagePath: 'assets/images/avatar.png'),
     User(id: '2', name: 'Muskan', imagePath: 'assets/images/avatar.png'),
     User(id: '3', name: 'Anshi', imagePath: 'assets/images/avatar.png'),
@@ -39,7 +39,7 @@ class TabContentUI {
   ];
 
   // Dynamic list to store pending request users
-  static List<User> _requestUsers = [
+  static final List<User> _requestUsers = [
     User(id: '1', name: 'Clara', imagePath: 'assets/images/avatar.png'),
     User(id: '2', name: 'Muskan', imagePath: 'assets/images/avatar.png'),
     User(id: '3', name: 'Anshi', imagePath: 'assets/images/avatar.png'),
@@ -77,13 +77,13 @@ class TabContentUI {
   static List<User> _invitedAcceptedUsers = [];
   
   // Dynamic list to store accepted users from eventRequests (for confirmed flow)
-  static List<User> _confirmedUsers = [];
+  static final List<User> _confirmedUsers = [];
   
   // Set to track which users have been checked in (separate from confirmation status)
-  static Set<String> _checkedInUserIds = {};
+  static final Set<String> _checkedInUserIds = {};
   
   // Dynamic list to store invited users from sentInvitesScreen (cumulative)
-  static List<User> _invitedUsersList = [];
+  static final List<User> _invitedUsersList = [];
   
   // Method to add invited users from sentInvitesScreen (appends, doesn't replace)
   static void addInvitedUsers(List<User> users) {
@@ -190,7 +190,7 @@ class TabContentUI {
     }
   }
 
-  static List<User> _checkInUsers = [
+  static final List<User> _checkInUsers = [
     User(id: '1', name: 'Muskan', imagePath: 'assets/images/avatar.png', isProcessed: true, isSelected: false),
     User(id: '2', name: 'Anshi', imagePath: 'assets/images/avatar.png', isProcessed: false, isSelected: false),
     User(id: '3', name: 'Sanjana', imagePath: 'assets/images/avatar.png', isProcessed: false, isSelected: false),

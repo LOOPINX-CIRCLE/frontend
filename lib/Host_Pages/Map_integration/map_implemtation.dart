@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
@@ -22,15 +24,105 @@ class _MapControllerState extends State<MapController> {
 
   bool get isActive => _focusNode.hasFocus || _controller.text.isNotEmpty;
 
+  Timer? _debounceTimer;
+  
+  void _selectLocation(String suggestion) {
+    // Extract venue name (first part before comma)
+    String venueName = suggestion.split(",").first.trim();
+    
+    if (kDebugMode) {
+      print("🎯 Selected location: $suggestion");
+      print("🎯 Extracted venue name: $venueName");
+    }
+    
+    _controller.text = venueName; // Show only venue name in input
+    FocusScope.of(context).unfocus();
+
+    // ✅ Update EventController with both values
+    eventController.loaction.value = suggestion; // full address for backend
+    eventController.mainLocationName.value = venueName; // venue name for display
+    
+    // Additional location data for backend
+    eventController.locationPlaceId.value = ""; // Place ID will be populated when available
+    eventController.locationCountryCode.value = "IN"; // India
+    
+    // Set default coordinates (will be replaced with actual coordinates if needed)
+    // For now using approximate coordinates for common Indian cities
+    if (venueName.toLowerCase().contains('mumbai')) {
+      eventController.latitude.value = 19.0760;
+      eventController.longitude.value = 72.8777;
+    } else if (venueName.toLowerCase().contains('delhi')) {
+      eventController.latitude.value = 28.7041;
+      eventController.longitude.value = 77.1025;
+    } else if (venueName.toLowerCase().contains('bangalore') || venueName.toLowerCase().contains('bengaluru')) {
+      eventController.latitude.value = 12.9716;
+      eventController.longitude.value = 77.5946;
+    } else if (venueName.toLowerCase().contains('dehradun')) {
+      eventController.latitude.value = 30.3165;
+      eventController.longitude.value = 78.0322;
+    } else {
+      // Default to Delhi coordinates
+      eventController.latitude.value = 28.7041;
+      eventController.longitude.value = 77.1025;
+    }
+    
+    if (kDebugMode) {
+      print("✅ EventController updated:");
+      print("   Full location: ${eventController.loaction.value}");
+      print("   Venue name: ${eventController.mainLocationName.value}");
+      print("   Coordinates: ${eventController.latitude.value}, ${eventController.longitude.value}");
+      print("   Ready for backend submission");
+    }
+
+    setState(() {
+      _suggestions = [];
+    });
+    
+    // Show confirmation
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✓ Venue selected: $venueName'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+  
   void _onSearchChanged(String input) async {
-    if (input.isEmpty) {
+    if (kDebugMode) {
+      print("🔍 MapController _onSearchChanged called with: '$input'");
+    }
+    
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+    
+    if (input.trim().isEmpty) {
       setState(() => _suggestions = []);
       return;
     }
-
-    final results = await _apiServices.fetchPlaceSuggestions(input);
-    setState(() {
-      _suggestions = results;
+    
+    // Only search after user stops typing for 300ms (reduced for better UX)
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      if (kDebugMode) {
+        print("🚀 MapController: Starting API call for: '$input'");
+      }
+      
+      final results = await _apiServices.fetchPlaceSuggestions(input.trim());
+      
+      if (kDebugMode) {
+        print("📍 MapController: API returned ${results.length} suggestions");
+        if (results.isNotEmpty) {
+          print("📍 First suggestion: ${results.first}");
+        } else {
+          print("⚠️ MapController: No suggestions returned from API");
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _suggestions = results;
+        });
+      }
     });
   }
 
@@ -44,6 +136,7 @@ class _MapControllerState extends State<MapController> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -55,73 +148,232 @@ class _MapControllerState extends State<MapController> {
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.3),
+          width: 1,
+        ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         children: [
-          Row(
-            children: [
-              Image.asset(
-                "assets/icons/Map Point.png",
-                width: 24,
-                height: 24,
-                color: isActive ? Colors.white : Colors.grey, // dynamic color
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  style: GoogleFonts.poppins(color: Colors.white),
-                  onChanged: (value) {
-                    _onSearchChanged(value);
-                    setState(() {}); // update image color if needed
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Add venue',
-                    hintStyle: GoogleFonts.poppins(
-                      color: Colors.grey,
-                      fontSize: 14,
-                    ),
-                    filled: true,
-                    fillColor: const Color(0xFF1E1E1E),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+          // Input field with icon
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Image.asset(
+                  "assets/icons/Map Point.png",
+                  width: 24,
+                  height: 24,
+                  color: isActive ? Colors.white : Colors.grey,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    style: GoogleFonts.poppins(color: Colors.white),
+                    onChanged: (value) {
+                      _onSearchChanged(value);
+                      setState(() {});
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Type to search venues, cities, areas... (e.g. "Kapil Kavuri")',
+                      hintStyle: GoogleFonts.poppins(
+                        color: Colors.grey,
+                        fontSize: 14,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF1E1E1E),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 14,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+                if (_suggestions.isNotEmpty || _controller.text.isNotEmpty)
+                  IconButton(
+                    onPressed: () {
+                      _controller.clear();
+                      FocusScope.of(context).unfocus();
+                      setState(() {
+                        _suggestions = [];
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.clear,
+                      color: Colors.grey,
+                      size: 20,
+                    ),
+                  ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-
-          // 📍 List of suggestions
-          if (_suggestions.isNotEmpty)
-            ..._suggestions.map(
-              (suggestion) => ListTile(
-                title: Text(
-                  suggestion,
-                  style: const TextStyle(color: Colors.white),
+          
+          // Show help text when focused but no input
+          if (isActive && _controller.text.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey.withOpacity(0.3),
+                    width: 1,
+                  ),
                 ),
-                onTap: () {
-                  _controller.text = suggestion;
-                  FocusScope.of(context).unfocus();
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.search,
+                    color: Colors.grey,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Start typing to search for locations',
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                  Text(
+                    'e.g. "Kapil Kavuri", "Hyderabad", "Cyber City"',
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey.withOpacity(0.7),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+          // Show no results message
+          if (_controller.text.isNotEmpty && _suggestions.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.location_off,
+                    color: Colors.grey,
+                    size: 24,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No locations found',
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    'Try searching for a city, area, or venue name',
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey.withOpacity(0.7),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                  // ✅ update both in controller
-                  eventController.loaction.value = suggestion; // full address
-                  eventController.mainLocationName.value = suggestion
-                      .split(",")
-                      .first; // sirf main name
-
-                  setState(() {
-                    _suggestions = [];
-                  });
+          // Suggestions dropdown inside the same container
+          if (_suggestions.isNotEmpty)
+            Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Suggestions header
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: Colors.grey,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_suggestions.length} location${_suggestions.length == 1 ? '' : 's'} found - Tap to select',
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Suggestions list
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _suggestions.length,
+                      padding: EdgeInsets.zero,
+                      itemBuilder: (context, index) {
+                  final suggestion = _suggestions[index];
+                  return Container(
+                    decoration: BoxDecoration(
+                      border: index < _suggestions.length - 1
+                          ? Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.withOpacity(0.2),
+                                width: 0.5,
+                              ),
+                            )
+                          : null,
+                    ),
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      leading: const Icon(
+                        Icons.location_on,
+                        color: Colors.grey,
+                        size: 18,
+                      ),
+                      title: Text(
+                        suggestion,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => _selectLocation(suggestion),
+                    ),
+                  );
                 },
+              ),
+                  ),
+                ],
               ),
             ),
         ],

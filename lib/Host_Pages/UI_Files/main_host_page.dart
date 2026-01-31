@@ -25,7 +25,6 @@ class MainHostPage extends StatelessWidget {
               child: GestureDetector(
                 onTap: () {
                   Get.to(() => ChoosingTheme());
-                  debugPrint("Image Button Clicked!");
                 },
                 child: Image.asset(
                   "assets/images/button/Button Active V2.png",

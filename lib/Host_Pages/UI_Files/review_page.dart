@@ -1,6 +1,9 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +14,8 @@ import 'package:text_code/Host_Pages/UI_Files/data_fetch_page_forreview.dart';
 import 'package:text_code/Host_Pages/UI_Files/share_screen.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
 import 'package:text_code/Reusable/text_reusable.dart';
+import 'package:text_code/core/services/event_service.dart';
+import 'package:text_code/core/constants/env.dart';
 
 class ReviewEventPage extends StatelessWidget {
   ReviewEventPage({super.key});
@@ -249,7 +254,7 @@ class ReviewEventPage extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 12),
                             child: MapPreview(
                               placeName: controllerloc.loaction.value,
-                              apiKey: "AIzaSyBAAPv0Z6CZUdjnphbj9XH7YR1Z2jOS684",
+                              apiKey: Env.googleMapsApiKey,
                             ),
                           ),
                       ],
@@ -444,20 +449,167 @@ class ReviewEventPage extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.only(left: 30, right: 30, top: 20),
           child: GestureDetector(
-            onTap: () {
-              // Decide which image to pass
-              Widget imageToSend;
+            onTap: () async {
 
-              if (controller.images.isNotEmpty &&
-                  controller.images[0].path.isNotEmpty) {
-                // ✅ user picked image
-                imageToSend = Image.file(controller.images[0]);
-              } else {
-                // ✅ default image
-                imageToSend = Image.asset(controller.defaultAssetImage);
+
+              // Validate date and time are both selected
+              String dateStr = controllerloc.date.value.trim();
+              String timeStr = controllerloc.time.value.trim();
+              if (dateStr.isEmpty || timeStr.isEmpty) {
+                Get.snackbar('Error', 'Please select both date and time for your event.', backgroundColor: Colors.red, colorText: Colors.white);
+                return;
               }
-              controllerloc.resetEventData();
-              Get.offAll(ShareScreen(imageWidget: imageToSend));
+
+              // Normalize and parse time (support 12/24 hour, trim, add seconds if missing)
+              String normTime = timeStr.replaceAll(RegExp(r'\s+'), '').toUpperCase();
+              // If AM/PM present, convert to 24-hour
+              String time24 = normTime;
+              final ampmMatch = RegExp(r'^(\d{1,2}):(\d{2})(?::(\d{2}))?(AM|PM)$').firstMatch(normTime);
+              if (ampmMatch != null) {
+                int hour = int.parse(ampmMatch.group(1)!);
+                int minute = int.parse(ampmMatch.group(2)!);
+                int second = ampmMatch.group(3) != null ? int.parse(ampmMatch.group(3)!) : 0;
+                String ampm = ampmMatch.group(4)!;
+                if (ampm == 'PM' && hour < 12) hour += 12;
+                if (ampm == 'AM' && hour == 12) hour = 0;
+                time24 = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}:${second.toString().padLeft(2, '0')}';
+              } else {
+                // If only HH:mm, add seconds
+                if (RegExp(r'^\d{1,2}:\d{2}$').hasMatch(time24)) {
+                  time24 += ':00';
+                }
+              }
+
+              // Parse date and time to ISO 8601
+              DateTime? parsedDateTime;
+              try {
+                List<String> dateParts = dateStr.split('/');
+                if (dateParts.length == 3) {
+                  String formattedDate = '${dateParts[2]}-${dateParts[1].padLeft(2, '0')}-${dateParts[0].padLeft(2, '0')}';
+                  String fullDateTime = formattedDate; 'T' + time24;
+                  parsedDateTime = DateTime.parse(fullDateTime);
+                }
+              } catch (_) {}
+              if (parsedDateTime == null) {
+                Get.snackbar('Error', 'Invalid date or time format.\nDate: $dateStr\nTime: $timeStr\nNormalized: $time24', backgroundColor: Colors.red, colorText: Colors.white);
+                return;
+              }
+
+              // Format as ISO 8601 with Z (UTC)
+              String isoStartTime = parsedDateTime.toUtc().toIso8601String();
+              if (!isoStartTime.endsWith('Z')) isoStartTime += 'Z';
+              // Check if selected datetime is in the future
+              if (!parsedDateTime.isAfter(DateTime.now())) {
+                Get.snackbar('Error', 'Event start time must be in the future.', backgroundColor: Colors.red, colorText: Colors.white);
+                return;
+              }
+
+              // Show loading dialog
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(child: CircularProgressIndicator()),
+              );
+              try {
+                // Validate required fields before API call
+                if (controllerloc.eventTitle.value.trim().isEmpty) {
+                  Navigator.of(context).pop(); // Close loading
+                  Get.snackbar('Error', 'Event title is required', backgroundColor: Colors.red, colorText: Colors.white);
+                  return;
+                }
+                if (controllerloc.mainLocationName.value.trim().isEmpty) {
+                  Navigator.of(context).pop(); // Close loading
+                  Get.snackbar('Error', 'Venue name is required', backgroundColor: Colors.red, colorText: Colors.white);
+                  return;
+                }
+                
+                // Validate duration parsing
+                String durationStr = controllerloc.duration.value.trim();
+                // Remove "hr" suffix if present
+                String durationNumStr = durationStr.replaceAll(RegExp(r'hr$|hours?$|h$', caseSensitive: false), '').trim();
+                double? durationHours = double.tryParse(durationNumStr);
+                
+                if (durationStr.isEmpty || durationHours == null || durationHours <= 0) {
+                  Navigator.of(context).pop(); // Close loading
+                  Get.snackbar('Error', 'Event duration must be greater than 0 hours (currently: "$durationStr")', 
+                    backgroundColor: Colors.red, colorText: Colors.white);
+                  return;
+                }
+
+                // Prepare cover images (no compression, allow any image)
+                List<File> coverImages = controller.images.where((f) => f.path.isNotEmpty).toList();
+                String isoStartTime = parsedDateTime.toUtc().toIso8601String();
+
+                // Determine if event is paid (currently defaulting to free)
+                bool isPaid = false; // Future: Add UI toggle for paid/free events
+                double ticketPrice = isPaid ? double.tryParse(controllerloc.ticketPrice.value) ?? 0.0 : 0.0;
+
+                // Call event creation API
+                final eventService = EventService();
+                final result = await eventService.createEvent(
+                  title: controllerloc.eventTitle.value,
+                  description: controllerloc.description.value,
+                  startTime: isoStartTime,
+                  durationHours: durationHours, // Use already parsed and validated value
+                  venueName: controllerloc.mainLocationName.value, // ✅ Required venue_name field
+                  locationAddress: controllerloc.loaction.value,
+                  locationCity: controllerloc.mainLocationName.value,
+                  locationLatitude: controllerloc.latitude.value,
+                  locationLongitude: controllerloc.longitude.value,
+                  locationPlaceId: controllerloc.locationPlaceId.value,
+                  locationCountryCode: controllerloc.locationCountryCode.value,
+                  maxCapacity: int.tryParse(controllerloc.capacity.value) ?? 0,
+                  isPaid: isPaid,
+                  ticketPrice: ticketPrice,
+                  allowPlusOne: true, // Set as needed
+                  gstNumber: "", // Set as needed
+                  allowedGenders: "all", // Set as needed
+                  status: "draft", // Set as needed
+                  isPublic: true, // Set as needed
+                  eventInterestIds: "[]", // Empty array for now
+                  coverImages: coverImages,
+                );
+                Navigator.of(context).pop(); // Close loading
+                Get.snackbar('Success', 'Event posted successfully!', backgroundColor: Colors.green, colorText: Colors.white);
+                // Navigate to share screen
+                Widget imageToSend;
+                if (controller.images.isNotEmpty && controller.images[0].path.isNotEmpty) {
+                  imageToSend = Image.file(controller.images[0]);
+                } else {
+                  imageToSend = Image.asset(controller.defaultAssetImage);
+                }
+                controllerloc.resetEventData();
+                Get.offAll(ShareScreen(imageWidget: imageToSend));
+              } catch (e) {
+                Navigator.of(context).pop(); // Close loading
+                String errorMessage = e.toString();
+                
+                // Parse API error messages for better user feedback
+                if (errorMessage.contains('TITLE_REQUIRED')) {
+                  errorMessage = 'Event title is required';
+                } else if (errorMessage.contains('VENUE_NAME_REQUIRED')) {
+                  errorMessage = 'Venue name is required';
+                } else if (errorMessage.contains('INVALID_DURATION')) {
+                  errorMessage = 'Event duration must be greater than zero';
+                } else if (errorMessage.contains('START_TIME_IN_PAST')) {
+                  errorMessage = 'Event start time cannot be in the past';
+                } else if (errorMessage.contains('INVALID_DATETIME_FORMAT')) {
+                  errorMessage = 'Invalid date or time format';
+                } else if (errorMessage.contains('Authentication required')) {
+                  errorMessage = 'Please login to create an event';
+                } else if (errorMessage.contains('venue_name')) {
+                  errorMessage = 'Venue name is required for the event';
+                } else if (errorMessage.contains('title')) {
+                  errorMessage = 'Please provide a valid event title';
+                } else {
+                  errorMessage = 'Failed to create event. Please check your details and try again.';
+                }
+                
+                Get.snackbar('Error', errorMessage, 
+                  backgroundColor: Colors.red, 
+                  colorText: Colors.white,
+                  duration: Duration(seconds: 4));
+              }
 
               // Navigator.push(
               //   context,

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Home_pages/UI_Design/home_page.dart';
-import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
 import 'package:text_code/Reusable/text_reusable.dart';
 
 class Failed extends StatelessWidget {
