@@ -56,13 +56,14 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
   }
 
   bool get allImagesSelected => _selectedImages.every((file) => file != null);
-  bool get hasAtLeastOneImage => _selectedImages.any((file) => file != null);
+  int get uploadedImageCount => _selectedImages.where((file) => file != null).length;
+  bool get hasMinImages => uploadedImageCount >= 4;
 
   Future<void> _onNext() async {
-    if (!hasAtLeastOneImage) {
+    if (!hasMinImages) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one photo'),
+          content: Text('Please select at least 4 photos'),
           backgroundColor: Colors.red,
         ),
       );
@@ -176,10 +177,10 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         }
       }
 
-      // Check if we have at least one image (API requirement)
-      if (imageData.isEmpty) {
+      // Check if we have at least 4 images (API requirement)
+      if (imageData.length < 4) {
         throw ApiException(
-          message: 'Please select at least one profile picture',
+          message: 'Please select at least 4 profile pictures',
           statusCode: 400,
         );
       }
@@ -218,7 +219,20 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         if (kDebugMode) {
           print('Profile completed successfully. Token should be current.');
         }
-        
+
+        // Fetch and set the latest profile in ProfileController before navigating
+        try {
+          final profileController = Get.find<ProfileController>();
+          await profileController.fetchProfile();
+          if (kDebugMode) {
+            print('Fetched latest profile after completion.');
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error fetching profile after completion: $e');
+          }
+        }
+
         // Navigate to home
         Navigator.pushReplacement(
           context,
@@ -342,7 +356,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
           },
         ),
       );
-    } else if (!kIsWeb && imageFile != null) {
+    } else if (!kIsWeb) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: Image.file(
@@ -468,22 +482,45 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
                   const SizedBox(height: 12),
                   
                   // Instructions
-                  Text(
-                    "Minimum 1 photo is required ",
-                    style: TextStyle(
-                      color: const Color(0xff868686),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'BricolageGrotesque',
+                  if (hasMinImages) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      "Photos uploaded successfully",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'BricolageGrotesque',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Your photo will be visible to event hosts and members",
+                      style: TextStyle(
+                        color: Color(0xff868686),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'BricolageGrotesque',
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      "Minimum 4 photos are required ",
+                      style: TextStyle(
+                        color: const Color(0xff868686),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'BricolageGrotesque',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
                  
                   
                   SizedBox(height: screenHeight * 0.15),
                   
                   GestureDetector(
-                    onTap: hasAtLeastOneImage ? _onNext : null,
+                    onTap: hasMinImages ? _onNext : null,
                     child: Container(
                       width: double.infinity,
                       height: 51,
@@ -493,9 +530,9 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: Image.asset(
-                          hasAtLeastOneImage
-                              ? "assets/images/button2.png"   // image when images are selected
-                              : "assets/images/button1.png", // image when no images selected
+                          hasMinImages
+                              ? "assets/images/button2.png"   // image when minimum images are selected
+                              : "assets/images/button1.png", // image when not enough images selected
                           fit: BoxFit.cover,
                         ),
                       ),

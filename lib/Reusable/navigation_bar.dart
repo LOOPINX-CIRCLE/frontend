@@ -3,10 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:text_code/Home_pages/UI_Design/home_page.dart';
 import 'package:text_code/Home_pages/UI_Design/home_with_tabs.dart';
 import 'package:text_code/Host_Pages/UI_Files/main_host_page.dart';
-import 'package:text_code/login-signup/sign_up/booked_ticket.dart';
 import 'package:text_code/profilePage/profile.dart';
 
 class TicketController extends GetxController {

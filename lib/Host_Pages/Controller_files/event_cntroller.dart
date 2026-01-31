@@ -16,6 +16,8 @@ class EventController extends GetxController {
   var latitude = 0.0.obs;
   var longitude = 0.0.obs;
   var eventImage = "".obs; // Event image for tickets
+  var locationPlaceId = "".obs;
+  var locationCountryCode = "".obs;
 
   // Getter: Date + Time ek sath
   String get dateTime => "${date.value} ${time.value}";

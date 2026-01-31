@@ -69,19 +69,24 @@ class ChoosingTheme extends StatelessWidget {
 
             SizedBox(height: 10),
             Expanded(
-              child: Obx(
-                () => Wrap(
+              child: Obx(() {
+                if (controller.isLoading.value) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                if (controller.errorMessage.isNotEmpty) {
+                  return Center(child: Text(controller.errorMessage.value, style: TextStyle(color: Colors.red)));
+                }
+                final tags = controller.tags;
+                return Wrap(
                   spacing: 8,
                   runSpacing: 12,
-                  children: List.generate(controller.tags.length, (index) {
+                  children: List.generate(tags.length, (index) {
                     final isSelected = controller.isSelecteds(index);
                     return GestureDetector(
                       onTap: () {
-                        controller.selectedIndex.value =
-                            index; // ✅ select index
-                        controller.isActive.value = true; // ✅ button active
-                        eventController.experienceType.value =
-                            controller.tags[index]; // ✅ save eventController me
+                        controller.selectedIndex.value = index;
+                        controller.isActive.value = true;
+                        eventController.experienceType.value = tags[index];
                       },
 
                       child: Container(
@@ -94,7 +99,7 @@ class ChoosingTheme extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
-                          controller.tags[index],
+                          tags[index],
                           style: GoogleFonts.poppins(
                             color: Colors.black,
                             fontSize: 15,
@@ -104,8 +109,8 @@ class ChoosingTheme extends StatelessWidget {
                       ),
                     );
                   }),
-                ),
-              ),
+                );
+              }),
             ),
             SizedBox(height: 60),
             Obx(

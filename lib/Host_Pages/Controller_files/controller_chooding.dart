@@ -1,29 +1,39 @@
 import 'package:get/get.dart';
+import 'package:text_code/core/services/auth_service.dart';
+import 'package:text_code/core/models/event_interest.dart';
 
 class ChoosingThemeController extends GetxController {
   // Observable set to track selected tags
   var selectedTags = <String>[].obs;
   var selectedTag = "".obs;
   var selectedIndex = (-1).obs;
-  final List<String> tags = [
-    "PARTY",
-    "HOUSE PARTY",
-    "MUSIC",
-    "PICNIC",
-    "OUTDOOR ACTIVITIES",
-    "LIQUOR TASTING",
-    "BRUNCH",
-    "GAMES",
-    "FOOD WALK",
-    "DANCE",
-    "COMEDY CLUB",
-    "ART & CRAFT",
-    "WEEKEND GETAWAY",
-    "TRAVEL",
-    "DINNER",
-    "LUNCH",
-    "COOK FEST",
-  ];
+  final List<String> tags = [];
+
+  // API event interests
+  var eventInterests = <EventInterest>[].obs;
+  var isLoading = false.obs;
+  var errorMessage = ''.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    fetchEventInterestsFromApi();
+  }
+
+  Future<void> fetchEventInterestsFromApi() async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      final interests = await AuthService().fetchEventInterests();
+      eventInterests.assignAll(interests);
+      tags.clear();
+      tags.addAll(interests.map((e) => e.name));
+    } catch (e) {
+      errorMessage.value = e.toString();
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   // Toggle tag selection
   void toggleTag(String tag) {

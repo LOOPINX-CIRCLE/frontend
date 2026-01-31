@@ -57,7 +57,7 @@ class EventRequests extends StatelessWidget {
             
             // Notify parent to refresh count
             if (onUsersAcceptedCallback != null) {
-              onUsersAcceptedCallback!();
+              onUsersAcceptedCallback();
             }
           }
         }
@@ -312,7 +312,7 @@ class EventRequests extends StatelessWidget {
                         
                         // Notify parent to refresh count
                         if (onUsersAcceptedCallback != null) {
-                          onUsersAcceptedCallback!();
+                          onUsersAcceptedCallback();
                         }
                       }
                       

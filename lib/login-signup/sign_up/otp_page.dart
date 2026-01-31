@@ -1,6 +1,5 @@
 
 import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:text_code/login-signup/sign_up/name_page.dart';
 import 'package:pinput/pinput.dart';

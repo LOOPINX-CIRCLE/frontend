@@ -150,8 +150,9 @@ class TicketInfoCard extends StatelessWidget {
           isBold: item["isBold"] ?? false,
         ),
       );
-      if (i != infoItems.length - 1)
+      if (i != infoItems.length - 1) {
         rows.add(const Divider(color: Colors.grey));
+      }
     }
     return rows;
   }

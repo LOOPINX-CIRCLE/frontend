@@ -131,7 +131,7 @@ class CapactiyPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       FormLabel("Ticket Price", fontSize: 16),
-                      Container(
+                      Obx(() => Container(
                         height: 50,
                         decoration: BoxDecoration(
                           color: Color(0xFF1E1E1E),
@@ -150,32 +150,28 @@ class CapactiyPage extends StatelessWidget {
                             Expanded(
                               child: TextField(
                                 controller: controller.ticketPriceController,
-                                keyboardType:
-                                    TextInputType.number, // ✅ only number input
-
+                                keyboardType: TextInputType.number,
+                                enabled: !controller.isFreeTicket.value, // Disable if free
                                 onChanged: controller.updateTicketPrice,
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
-                                  color: Colors.white,
+                                  color: controller.isFreeTicket.value ? Colors.grey : Colors.white,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: "0", // ✅ default hint 0
+                                  hintText: "0",
                                   hintStyle: GoogleFonts.poppins(
                                     color: Colors.grey,
                                     fontSize: 14,
                                   ),
-                                  border:
-                                      InputBorder.none, // ✅ removes underline
-                                  focusedBorder: InputBorder
-                                      .none, // ✅ no line when focused
-                                  enabledBorder: InputBorder
-                                      .none, // ✅ no line when enabled
+                                  border: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ),
+                      )),
 
                       SizedBox(height: 10),
                       reusableText(
