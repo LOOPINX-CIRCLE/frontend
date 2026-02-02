@@ -1,11 +1,14 @@
 
 import 'dart:ui';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:text_code/login-signup/sign_up/name_page.dart';
 import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
+import 'package:text_code/Reusable/navigation_bar.dart';
 
 class OTPPage extends StatefulWidget {
   final String phoneNumber;
@@ -52,11 +55,69 @@ class _OTPPageState extends State<OTPPage> {
       // Check if verification was successful
       if (response['success'] == true && response['token'] != null) {
         // Token is automatically stored by AuthService.verifyOTP()
-        // Navigate to name page
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NameInputScreen()),
-        );
+        
+        // Debug: Print the full response to see its structure
+        if (kDebugMode) {
+          print('OTP Response: $response');
+        }
+        
+        // Check if user has completed profile and is verified
+        // Handle both direct fields and nested in 'data' object
+        // Also handle string "true"/"false" vs actual booleans
+        final needsProfileCompletionRaw = response['needs_profile_completion'] ?? 
+                                         response['data']?['needs_profile_completion'];
+        final isVerifiedRaw = response['is_verified'] ?? 
+                             response['data']?['is_verified'];
+        
+        // Convert to bool (handle both bool and string types)
+        bool needsProfileCompletion = true; // Default to true (needs completion)
+        bool isVerified = false; // Default to false (not verified)
+        
+        if (needsProfileCompletionRaw != null) {
+          if (needsProfileCompletionRaw is bool) {
+            needsProfileCompletion = needsProfileCompletionRaw;
+          } else if (needsProfileCompletionRaw is String) {
+            needsProfileCompletion = needsProfileCompletionRaw.toLowerCase() == 'true';
+          } else {
+            needsProfileCompletion = needsProfileCompletionRaw == true;
+          }
+        }
+        
+        if (isVerifiedRaw != null) {
+          if (isVerifiedRaw is bool) {
+            isVerified = isVerifiedRaw;
+          } else if (isVerifiedRaw is String) {
+            isVerified = isVerifiedRaw.toLowerCase() == 'true';
+          } else {
+            isVerified = isVerifiedRaw == true;
+          }
+        }
+        
+        if (kDebugMode) {
+          print('needs_profile_completion: $needsProfileCompletion, is_verified: $isVerified');
+        }
+        
+        // If profile is complete (needs_profile_completion = false) AND user is verified
+        if (needsProfileCompletion == false && isVerified == true) {
+          if (kDebugMode) {
+            print('Navigating to home page - user is verified and profile complete');
+          }
+          // User has completed profile and is verified - navigate to home page
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
+            (route) => false, // Remove all previous routes
+          );
+        } else {
+          if (kDebugMode) {
+            print('Navigating to name page - user needs to complete profile');
+          }
+          // User needs to complete profile - navigate to name page
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => NameInputScreen()),
+          );
+        }
       } else {
         // Handle failure case
         final errorMessage = response['message']?.toString() ?? 'OTP verification failed';
