@@ -10,6 +10,9 @@ class CoverImageController extends GetxController {
   var currentImageIndex = 0.obs;
   final PageController pageController = PageController();
 
+  // Field to store event ID
+  int? eventId;
+
   final String defaultAssetImage = "assets/images/Frame 1410136456.png";
 
   Future<void> pickImage(int index) async {

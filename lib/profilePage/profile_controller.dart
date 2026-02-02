@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/models/user_profile.dart';
@@ -7,7 +6,20 @@ import 'package:text_code/core/network/api_exception.dart';
 import 'package:flutter/foundation.dart';
 
 class ProfileController extends GetxController {
+      // Clear cached profile data
+      void clearProfile() {
+        userProfile.value = null;
+        isLoading.value = false;
+        errorMessage.value = null;
+      }
+    // Set profile from cache or after login
+    void setProfile(UserProfile profile) {
+      userProfile.value = profile;
+      isLoading.value = false;
+      errorMessage.value = null;
+    }
   final AuthService _authService = AuthService();
+  AuthService get authService => _authService;
   
   // Store uploaded images
   RxList<File?> uploadedImages = <File?>[].obs;
@@ -35,14 +47,17 @@ class ProfileController extends GetxController {
     try {
       final profile = await _authService.fetchProfile();
       userProfile.value = profile;
-      
+
+      // Print profile picture URLs for debugging
+      print('Fetched profile picture URLs: \\n${profile.profilePictures}');
+
       // Load profile pictures if available
       if (profile.profilePictures.isNotEmpty) {
         // Note: Profile pictures from API are URLs, not local files
         // You may need to download them or handle them differently
         // For now, we'll keep the local image management separate
       }
-      
+
       if (kDebugMode) {
         print('Profile loaded: ${profile.name}, Age: ${profile.age}, Gender: ${profile.gender}');
       }
@@ -88,7 +103,10 @@ class ProfileController extends GetxController {
   String get userName => userProfile.value?.name ?? '';
   
   // Get user age from profile
-  String get userAge => userProfile.value?.age?.toString() ?? '';
+  String get userAge {
+    final age = userProfile.value?.age;
+    return age != null ? age.toString() : '';
+  }
   
   // Get user gender from profile
   String get userGender {

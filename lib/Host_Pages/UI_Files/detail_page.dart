@@ -242,6 +242,7 @@ class _DetailPageState extends State<DetailPage> {
 
                       FormLabel("Location", fontSize: 16),
                       MapController(),
+                      
                       SizedBox(height: 20),
                     ],
                   ),

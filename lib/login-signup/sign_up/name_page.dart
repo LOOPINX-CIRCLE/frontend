@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 
 class NameInputScreen extends StatefulWidget {
+  const NameInputScreen({super.key});
+
   @override
   State<NameInputScreen> createState() => _NameInputScreenState();
 }

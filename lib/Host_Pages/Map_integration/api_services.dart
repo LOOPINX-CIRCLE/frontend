@@ -1,49 +1,100 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
+import 'package:text_code/core/constants/env.dart';
 
 class ApiServicesMap {
   Future<List<String>> fetchPlaceSuggestions(String input) async {
-    const String apiKey = "AIzaSyBAAPv0Z6CZUdjnphbj9XH7YR1Z2jOS684";
+    final String apiKey = Env.googleMapsApiKey;
+    
+    if (kDebugMode) {
+      print("🔍 fetchPlaceSuggestions called with input: '$input'");
+      print("🗝️ API Key from Env: '${apiKey.isEmpty ? 'EMPTY' : 'LOADED (${apiKey.length} chars)'}");
+      print("🗝️ Full API Key: '$apiKey'");
+    }
+    
+    if (apiKey.isEmpty) {
+      if (kDebugMode) {
+        print("❌ API Key is empty!");
+      }
+      return [];
+    }
+    
+    if (input.trim().length < 2) {
+      if (kDebugMode) {
+        print("⚠️ Input too short, skipping API call");
+      }
+      return [];
+    }
+    
     final Uri url = Uri.parse(
       "https://maps.googleapis.com/maps/api/place/autocomplete/json"
-      "?input=$input"
+      "?input=${Uri.encodeComponent(input.trim())}"
       "&components=country:in" // restrict results to India
       "&key=$apiKey",
     );
 
+    if (kDebugMode) {
+      print("📡 Making request to: ${url.toString().replaceAll(apiKey, 'API_KEY_HIDDEN')}");
+    }
+
     try {
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(
+        const Duration(seconds: 15), // Increased timeout
+      );
+
+      if (kDebugMode) {
+        print("📥 Response status: ${response.statusCode}");
+        print("📥 Response body length: ${response.body.length}");
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        if (data["status"] != "OK") {
+        
+        if (kDebugMode) {
+          print("📋 API Status: ${data["status"]}");
+        }
+        
+        if (data["status"] == "OK") {
+          final List<dynamic> predictions = data['predictions'] ?? [];
+
+          // Extract only the 'description' from each prediction
+          List<String> suggestions = predictions
+              .map((prediction) => prediction['description'] as String)
+              .where((description) => description.isNotEmpty)
+              .toList();
+
           if (kDebugMode) {
-            print("⚠️ Google API Error: ${data["status"]}");
+            print("✅ Found ${suggestions.length} suggestions");
+            if (suggestions.isNotEmpty) {
+              print("📍 Sample suggestions:");
+              for (int i = 0; i < suggestions.length && i < 3; i++) {
+                print("   ${i + 1}. ${suggestions[i]}");
+              }
+            }
           }
+
+          return suggestions;
+        } else {
           if (kDebugMode) {
-            print("📌 Message: ${data["error_message"]}");
+            print("⚠️ Google API returned status: ${data["status"]}");
+            print("📌 Error message: ${data["error_message"] ?? 'No error message'}");
           }
           return [];
         }
-        final List<dynamic> predictions = data['predictions'];
-
-        // Extract only the 'description' from each prediction
-        List<String> suggestions = predictions
-            .map((prediction) => prediction['description'] as String)
-            .toList();
-
-        return suggestions;
       } else {
         if (kDebugMode) {
-          print("Failed with status code: ${response.statusCode}");
+          print("❌ HTTP Error: ${response.statusCode}");
+          print("📄 Response body: ${response.body}");
         }
         return [];
       }
     } catch (e) {
       if (kDebugMode) {
-        print("Error: $e");
+        print("💥 Exception in fetchPlaceSuggestions: $e");
       }
+      // Return empty list instead of letting exception propagate
       return [];
     }
   }

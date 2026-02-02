@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:text_code/core/services/auth_service.dart';
 
 import 'package:video_player/video_player.dart';
 // The screen to navigate to
@@ -55,17 +56,51 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Check if the widget is still in the tree before navigating
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        // Use a FadeTransition for a smoother screen change
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => MobileNo(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-        ),
-      );
+      await _checkAutoLogin();
+    }
+  }
+
+  Future<void> _checkAutoLogin() async {
+    try {
+      // Add a small delay to ensure services are initialized
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      final authService = AuthService();
+      final token = await authService.getStoredToken();
+      
+      if (mounted) {
+        if (token != null && token.isNotEmpty) {
+          // Token exists, go to home
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          // No token, go to login/signup - use direct navigation since route might not exist
+          Navigator.pushReplacement(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => MobileNo(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 500),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      print('Error during auto login check: $error');
+      // Fallback navigation on error - always go to mobile number page
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => MobileNo(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+      }
     }
   }
 

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
-import 'package:text_code/Reusable/text_reusable.dart';
 import 'package:text_code/Reusable/animated_page_wrapper.dart';
 
 class PaymentStatusScreen extends StatelessWidget {

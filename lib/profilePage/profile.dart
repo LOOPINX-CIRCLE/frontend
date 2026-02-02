@@ -23,15 +23,12 @@ class _ProfilePageState extends State<ProfilePage> {
   final ImagePicker _picker = ImagePicker();
   final ProfileController _profileController = Get.find<ProfileController>();
 
-  // Sample user data
-  String userName = "Muskan";
-  String userAge = "25";
-  String userGender = "Female";
-
+  // Remove hardcoded user data
 
   @override
   void initState() {
     super.initState();
+    // Show cached profile instantly; fetch only on manual refresh or update
   }
 
   // Check if user has uploaded exactly 6 images
@@ -118,6 +115,8 @@ class _ProfilePageState extends State<ProfilePage> {
       _pickAndAddImage(null);
     }
   }
+
+  
 
   Widget _buildProfileImage() {
     final firstImage = _profileController.uploadedImages.firstWhere(
@@ -224,83 +223,88 @@ class _ProfilePageState extends State<ProfilePage> {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    // Add top padding to match original layout (space for fixed back button)
-                    const SizedBox(height: 72),
+                    // Reduced top padding since no AppBar
+                    const SizedBox(height: 20),
                     // Profile Section - No background container
                     Padding(
                       padding: const EdgeInsets.only(left: 30),
-
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Profile Image
-                          Obx(() => _buildProfileImage()),
-
-                          const SizedBox(width: 16),
-
-                          // User Details
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  userName,
-                                  style: GoogleFonts.bricolageGrotesque(
-                                    color: Colors.white,
-                                    fontSize: 25,
-                                    fontWeight: FontWeight.bold,
+                      child: Obx(() {
+                        if (_profileController.isLoading.value) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+                        if (_profileController.errorMessage.value != null && _profileController.errorMessage.value!.isNotEmpty) {
+                          return Center(child: Text(_profileController.errorMessage.value!, style: TextStyle(color: Colors.red)));
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Profile Image
+                            _buildProfileImage(),
+                            const SizedBox(width: 16),
+                            // User Details
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _profileController.userName,
+                                    style: GoogleFonts.bricolageGrotesque(
+                                      color: Colors.white,
+                                      fontSize: 25,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "$userAge yr, $userGender",
-                                  style: GoogleFonts.bricolageGrotesque(
-                                    color: Colors.white,
-                                    fontSize: 14,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "${_profileController.userAge} yr, ${_profileController.userGender}",
+                                    style: GoogleFonts.bricolageGrotesque(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 8),
-                                // Show verified tag if user has HomePages access, otherwise show badge
-                                widget.hasHomePagesAccess
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 15,
-                                          vertical: 10,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[800],
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.verified,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              "Verified",
-                                              style: GoogleFonts.bricolageGrotesque(
+                                  const SizedBox(height: 8),
+                                  // Show verified tag if user has HomePages access, otherwise show badge
+                                  widget.hasHomePagesAccess
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 15,
+                                            vertical: 10,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[800],
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.verified,
                                                 color: Colors.white,
-                                                fontSize: 12,
+                                                size: 16,
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                "Verified",
+                                                style: GoogleFonts.bricolageGrotesque(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Image.asset(
+                                          'assets/images/Badge (1).png',
+                                          width: 100,
+                                          height: 50,
+                                          fit: BoxFit.contain,
                                         ),
-                                      )
-                                    : Image.asset(
-                                        'assets/images/Badge (1).png',
-                                        width: 100,
-                                        height: 50,
-                                        fit: BoxFit.contain,
-                                      ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                      }),
                     ),
 
                     const SizedBox(height: 16),
@@ -527,33 +531,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
-          // Back button - fixed at top, doesn't scroll
-          Positioned(
-            top: 0,
-            left: 0,
-            right: null,
-            bottom: null,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      shape: BoxShape.circle,
-                    ),
-                    child: Image.asset(
-                      'assets/images/arrowbackbutton.png',
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

@@ -8,7 +8,9 @@ import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_g
 import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Reusable/loopin_cta_button.dart';
+import 'package:text_code/core/constants/env.dart';
 import 'package:text_code/Reusable/smart_image.dart';
+
 
 class EventDetail extends StatefulWidget {
   final String title;
@@ -70,7 +72,7 @@ class _EventDetailState extends State<EventDetail> {
   }
   
   // Google Maps API Key
-  static const String _googleMapsApiKey = "AIzaSyBAAPv0Z6CZUdjnphbj9XH7YR1Z2jOS684";
+  static String get _googleMapsApiKey => Env.googleMapsApiKey;
   
   // Generate Google Static Map URL with dark maroon and mustard theme
   String _generateStaticMapUrl(String address) {
@@ -182,7 +184,7 @@ class _EventDetailState extends State<EventDetail> {
   }
 
   Widget _buildHeader(double screenHeight, double screenWidth) {
-    return Container(
+    return SizedBox(
       height: screenHeight * 0.5,
       width: double.infinity,
       child: Stack(
@@ -383,7 +385,7 @@ class _EventDetailState extends State<EventDetail> {
     
     return Padding(
       padding: const EdgeInsets.all(8),
-      child: Container(
+      child: SizedBox(
         width: screenWidth - 16, // Full width minus padding (8*2)
         child: isYoureGoing
           ? LoopinCtaButton(
