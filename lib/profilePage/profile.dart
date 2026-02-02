@@ -119,6 +119,46 @@ class _ProfilePageState extends State<ProfilePage> {
   
 
   Widget _buildProfileImage() {
+    // First check if there are server profile pictures
+    final serverImages = _profileController.profilePictureUrls;
+    if (serverImages.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Image.network(
+          serverImages.first, // Use the first server image as profile picture
+          width: 116,
+          height: 112,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            if (kDebugMode) {
+              print('Error loading profile image from server: $error');
+            }
+            // Fallback to local image if network image fails
+            return _buildLocalProfileImage();
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: 116,
+              height: 112,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+        ),
+      );
+    }
+    
+    // Fallback to local image
+    return _buildLocalProfileImage();
+  }
+
+  Widget _buildLocalProfileImage() {
     final firstImage = _profileController.uploadedImages.firstWhere(
       (img) => img != null,
       orElse: () => null,
@@ -161,11 +201,59 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildImageItem(int index, bool isVisible) {
-    final image = _profileController.uploadedImages[index];
-    final bytes = _profileController.imageBytes[index];
-
     if (!isVisible) {
       return Container(); // Empty container for non-visible items
+    }
+
+    // Get server images and local images
+    final serverImages = _profileController.profilePictureUrls;
+    final localImage = _profileController.uploadedImages[index];
+    final localBytes = _profileController.imageBytes[index];
+    
+    // Determine what to show: server image first, then local image, then empty slot
+    Widget imageWidget;
+    bool showDeleteButton = false;
+    
+    if (index < serverImages.length) {
+      // Show server image
+      imageWidget = Image.network(
+        serverImages[index],
+        width: 200,
+        height: 200,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          if (kDebugMode) {
+            print('Error loading server image at index $index: $error');
+          }
+          // If server image fails and we have local image, show local
+          if (localImage != null) {
+            return _buildLocalImageWidget(localImage, localBytes);
+          }
+          // Otherwise show placeholder
+          return _buildEmptyImageSlot();
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+      );
+    } else if (localImage != null) {
+      // Show local image if no server image at this index
+      imageWidget = _buildLocalImageWidget(localImage, localBytes);
+      showDeleteButton = !hasMaxImages; // Allow deletion of local images
+    } else {
+      // Show empty slot
+      imageWidget = _buildEmptyImageSlot();
     }
 
     return Container(
@@ -173,25 +261,11 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Stack(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: image != null
-                ? (kIsWeb && bytes != null
-                      ? Image.memory(
-                          bytes!,
-                          width: 200,
-                          height: 200,
-                          fit: BoxFit.cover,
-                        )
-                      : Image.file(
-                          image,
-                          width: 200,
-                          height: 200,
-                          fit: BoxFit.cover,
-                        ))
-                : Container(width: 200, height: 200, color: Colors.black),
+            borderRadius: BorderRadius.circular(28),
+            child: imageWidget,
           ),
-
-          if (image != null && !hasMaxImages)
+          // Show delete button only for local images
+          if (showDeleteButton)
             Positioned(
               top: 8,
               right: 12,
@@ -212,11 +286,61 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildLocalImageWidget(File localImage, Uint8List? localBytes) {
+    return kIsWeb && localBytes != null
+        ? Image.memory(
+            localBytes,
+            width: 200,
+            height: 200,
+            fit: BoxFit.cover,
+          )
+        : Image.file(
+            localImage,
+            width: 200,
+            height: 200,
+            fit: BoxFit.cover,
+          );
+  }
+
+  Widget _buildEmptyImageSlot() {
+    return DottedBorder(
+      borderType: BorderType.RRect,
+      radius: const Radius.circular(28),
+      dashPattern: const [8, 6],
+      color: const Color(0xFFAEAEAE),
+      strokeWidth: 2,
+      child: Container(
+        width: 200,
+        height: 200,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0A0909),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        alignment: Alignment.center,
+        child: Image.asset(
+          'assets/icons/galleryadd.png',
+          width: 60,
+          height: 60,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      body: Obx(() {
+        // Debug: Print server images info
+        if (kDebugMode) {
+          final serverImages = _profileController.profilePictureUrls;
+          print('🖼️ Building profile page with ${serverImages.length} server images:');
+          for (int i = 0; i < serverImages.length; i++) {
+            print('   Image $i: ${serverImages[i]}');
+          }
+        }
+        
+        return Stack(
         children: [
           // Scrollable content
           SafeArea(
@@ -357,68 +481,17 @@ class _ProfilePageState extends State<ProfilePage> {
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount:
-                            5, // Show only 5 slots (excluding profile image)
+                        itemCount: 6, // Show all 6 slots including server images
                         itemBuilder: (context, index) {
-                          return Obx(() {
-                            // Skip index 0 (profile image), start from index 1
-                            final actualIndex = index + 1;
-                            final image =
-                                _profileController.uploadedImages[actualIndex];
-                            final bytes =
-                                _profileController.imageBytes[actualIndex];
-
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                right: index < 4 ? 12 : 0,
-                              ),
-                              child: GestureDetector(
-                                onTap: () => _pickAndAddImage(actualIndex),
-                                child: SizedBox(
-                                  width: 200,
-                                  height: 200,
-                                  child: image != null
-                                      ? ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(28),
-                                          child: kIsWeb && bytes != null
-                                              ? Image.memory(
-                                                  bytes!,
-                                                  width: 200,
-                                                  height: 200,
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : Image.file(
-                                                  image,
-                                                  width: 200,
-                                                  height: 200,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                        )
-                                      : DottedBorder(
-                                          borderType: BorderType.RRect,
-                                          radius: const Radius.circular(28),
-                                          dashPattern: const [8, 6],
-                                          color: const Color(0xFFAEAEAE),
-                                          strokeWidth: 2,
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF0A0909),
-                                              borderRadius:
-                                                  BorderRadius.circular(28),
-                                            ),
-                                            alignment: Alignment.center,
-                                            child: Image.asset(
-                                              'assets/icons/galleryadd.png',
-                                              width: 60,
-                                              height: 60,
-                                            ),
-                                          ),
-                                        ),
-                                ),
-                              ),
-                            );
-                          });
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index < 5 ? 12 : 0,
+                            ),
+                            child: GestureDetector(
+                              onTap: () => _pickAndAddImage(index),
+                              child: _buildImageItem(index, true),
+                            ),
+                          );
                         },
                       ),
                     ),
@@ -532,7 +605,8 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
         ],
-      ),
+      );
+      }), // Close Obx wrapper
     );
   }
 
@@ -655,9 +729,8 @@ class _ProfilePageState extends State<ProfilePage> {
             color: Colors.grey[800],
           ),
       ],
-    ),
-  );
-}
+    ));
+  }
 
   void _showLogoutDialog() {
     showDialog(

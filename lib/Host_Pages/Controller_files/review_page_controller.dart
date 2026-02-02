@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 class CoverImageController extends GetxController {
-  RxList<File> images = <File>[].obs;
+  // Use XFile for web compatibility
+  RxList<XFile> images = <XFile>[].obs;
   final ImagePicker _picker = ImagePicker();
   var currentImageIndex = 0.obs;
   final PageController pageController = PageController();
@@ -16,17 +19,39 @@ class CoverImageController extends GetxController {
   final String defaultAssetImage = "assets/images/Frame 1410136456.png";
 
   Future<void> pickImage(int index) async {
-    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      final file = File(picked.path);
-      if (images.length > index) {
-        images[index] = file;
-      } else {
-        while (images.length < index) {
-          images.add(File('')); // placeholder
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      
+      if (picked != null) {
+        if (images.length > index) {
+          images[index] = picked;
+        } else {
+          while (images.length < index) {
+            // Create empty XFile placeholder for web compatibility
+            images.add(XFile(''));
+          }
+          images.add(picked);
         }
-        images.add(file);
+        
+        if (kDebugMode) {
+          print('Image picked successfully: ${picked.name}');
+        }
       }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error picking image: $e');
+      }
+      Get.snackbar(
+        'Error', 
+        'Failed to pick image. Please try again.',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
     }
   }
 

@@ -1,12 +1,12 @@
 // ignore_for_file: deprecated_member_use
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Host_Pages/Controller_files/review_page_controller.dart';
 import 'package:text_code/Host_Pages/Map_integration/map_implemtation.dart';
@@ -89,13 +89,40 @@ class ReviewEventPage extends StatelessWidget {
                       Widget displayImage;
                       if (controller.images.length > index &&
                           controller.images[index].path.isNotEmpty) {
-                        // User picked image
-                        displayImage = Image.file(
-                          controller.images[index],
-                          width: 347,
-                          height: 401,
-                          fit: BoxFit.cover,
-                        );
+                        // User picked image - Handle both mobile and web
+                        if (kIsWeb) {
+                          // For web, use Image.network with XFile
+                          displayImage = FutureBuilder<Uint8List>(
+                            future: controller.images[index].readAsBytes(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData) {
+                                return Image.memory(
+                                  snapshot.data!,
+                                  width: 347,
+                                  height: 401,
+                                  fit: BoxFit.cover,
+                                );
+                              } else {
+                                return Container(
+                                  color: Colors.grey.shade800,
+                                  width: 347,
+                                  height: 401,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        } else {
+                          // For mobile, use Image.file
+                          displayImage = Image.file(
+                            File(controller.images[index].path),
+                            width: 347,
+                            height: 401,
+                            fit: BoxFit.cover,
+                          );
+                        }
                       } else if (index == 0) {
                         // Default image in 1st slot
                         displayImage = Image.asset(
@@ -537,8 +564,25 @@ class ReviewEventPage extends StatelessWidget {
                 }
 
                 // Prepare cover images (no compression, allow any image)
-                List<File> coverImages = controller.images.where((f) => f.path.isNotEmpty).toList();
+                List<XFile> coverImages = controller.images.where((f) => f.path.isNotEmpty).toList();
                 String isoStartTime = parsedDateTime.toUtc().toIso8601String();
+
+                // Convert XFile to proper format for service
+                List<dynamic> serviceImages = [];
+                for (XFile xfile in coverImages) {
+                  if (kIsWeb) {
+                    // For web: convert XFile to map format
+                    final bytes = await xfile.readAsBytes();
+                    serviceImages.add({
+                      'bytes': bytes,
+                      'filename': xfile.name,
+                      'mimeType': xfile.mimeType ?? 'image/jpeg',
+                    });
+                  } else {
+                    // For mobile: convert XFile to File
+                    serviceImages.add(File(xfile.path));
+                  }
+                }
 
                 // Determine if event is paid (currently defaulting to free)
                 bool isPaid = false; // Future: Add UI toggle for paid/free events
@@ -567,14 +611,28 @@ class ReviewEventPage extends StatelessWidget {
                   status: "draft", // Set as needed
                   isPublic: true, // Set as needed
                   eventInterestIds: "[]", // Empty array for now
-                  coverImages: coverImages,
+                  coverImages: serviceImages, // Use properly formatted images
                 );
                 Navigator.of(context).pop(); // Close loading
                 Get.snackbar('Success', 'Event posted successfully!', backgroundColor: Colors.green, colorText: Colors.white);
                 // Navigate to share screen
                 Widget imageToSend;
                 if (controller.images.isNotEmpty && controller.images[0].path.isNotEmpty) {
-                  imageToSend = Image.file(controller.images[0]);
+                  if (kIsWeb) {
+                    // For web, use FutureBuilder to load XFile as bytes
+                    imageToSend = FutureBuilder<Uint8List>(
+                      future: controller.images[0].readAsBytes(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return Image.memory(snapshot.data!);
+                        }
+                        return Image.asset(controller.defaultAssetImage);
+                      },
+                    );
+                  } else {
+                    // For mobile, convert XFile to File
+                    imageToSend = Image.file(File(controller.images[0].path));
+                  }
                 } else {
                   imageToSend = Image.asset(controller.defaultAssetImage);
                 }
