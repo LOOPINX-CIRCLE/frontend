@@ -8,6 +8,7 @@ import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_g
 import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Reusable/loopin_cta_button.dart';
+import 'package:text_code/Reusable/smart_image.dart';
 
 class EventDetail extends StatefulWidget {
   final String title;
@@ -193,21 +194,9 @@ class _EventDetailState extends State<EventDetail> {
                 bottomLeft: Radius.circular(40), // ✅ curve bottom-left
                 bottomRight: Radius.circular(40), // ✅ curve bottom-right
               ),
-              child: Image.asset(
-                _resolveEventImage(),
+              child: SmartImage(
+                imagePath: _resolveEventImage(),
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[900],
-                    child: Center(
-                      child: Icon(
-                        Icons.image,
-                        color: Colors.grey[600],
-                        size: 100,
-                      ),
-                    ),
-                  );
-                },
               ),
             ),
           ),
