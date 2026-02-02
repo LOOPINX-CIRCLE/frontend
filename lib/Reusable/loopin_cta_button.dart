@@ -63,10 +63,12 @@ class LoopinCtaButton extends StatelessWidget {
                     child: Text(
                       label,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.bricolageGrotesque(
+                      style: TextStyle(
+                        fontFamily: 'ClashDisplay',
                         color: textColor ?? Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500, // Medium
+                        fontStyle: FontStyle.normal,
                       ),
                     ),
                   ),

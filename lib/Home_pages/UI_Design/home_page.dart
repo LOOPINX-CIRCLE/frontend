@@ -1,12 +1,15 @@
 // ignore_for_file: deprecated_member_use, avoid_print, unused_import
 
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:text_code/Home_pages/Controller/home_page.dart';
+import 'package:text_code/core/models/event.dart';
 import 'package:text_code/Reusable/eventcard.dart';
+import 'package:text_code/Reusable/smart_image.dart';
 import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
 import 'package:text_code/Host_Pages/Controller_files/capicity_cntoller.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
@@ -15,6 +18,8 @@ import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/Reusable/loopin_cta_button.dart';
 import 'package:text_code/Home_pages/UI_Design/eventdetail.dart';
 import 'package:text_code/HostManagement/mainScreen.dart';
+import 'package:text_code/core/utils/jwt_utils.dart';
+import 'package:text_code/core/services/secure_storage_service.dart';
 
 class HomePages extends StatefulWidget {
   const HomePages({super.key, this.showTabs = true, this.tabIndex, this.onTabChanged});
@@ -34,11 +39,40 @@ class _HomePagesState extends State<HomePages> {
     EventCardImageController(),
   );
   final eventController = Get.put(EventController());
+  final HomePageController homePageController = Get.put(HomePageController());
 
   final CapacityController capacityController = Get.put(CapacityController());
+  final SecureStorageService _secureStorage = SecureStorageService();
+  int? _currentUserId;
   int selectedIndex = 0;
+  
   void imageTap() {
     print("Image tapped!");
+  }
+
+  /// Get current user ID from token
+  Future<int?> _getCurrentUserId() async {
+    if (_currentUserId != null) return _currentUserId;
+    
+    try {
+      final token = await _secureStorage.getToken();
+      if (token != null) {
+        _currentUserId = JwtUtils.getUserId(token);
+        return _currentUserId;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting current user ID: $e');
+      }
+    }
+    return null;
+  }
+
+  /// Check if current user is hosting the event
+  Future<bool> _isUserHosting(Event event) async {
+    final userId = await _getCurrentUserId();
+    if (userId == null) return false;
+    return event.host.id == userId;
   }
 
   // Helper method to get date 48 hours before today
@@ -56,6 +90,31 @@ class _HomePagesState extends State<HomePages> {
       capacityController.guestPays.value =
           double.tryParse(capacityController.ticketPriceController.text) ?? 0.0;
     });
+  }
+
+  /// Helper function to build image from network URL or asset
+  Widget buildImage(String image) {
+    return SmartImage(
+      imagePath: image,
+      fit: BoxFit.cover,
+    );
+  }
+
+  /// Format date location string from event
+  /// Format: "7 Jun 25, Bastian garden city"
+  String _formatDateLocation(String startTime, String locationName) {
+    if (startTime.isEmpty) return locationName;
+    try {
+      final dateTime = DateTime.parse(startTime);
+      // Format: "7 Jun 25" (day without leading zero, abbreviated month, 2-digit year)
+      final day = dateTime.day; // No leading zero
+      final month = DateFormat('MMM').format(dateTime); // Abbreviated month
+      final year = dateTime.year.toString().substring(2); // Last 2 digits
+      final formattedDate = '$day $month $year';
+      return '$formattedDate, $locationName';
+    } catch (e) {
+      return locationName;
+    }
   }
 
   @override
@@ -89,18 +148,25 @@ class _HomePagesState extends State<HomePages> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            TextBricolage(
-                              FontWeight.normal,
+                            Text(
                               "Pick your scene",
-                              12,
+                              style: const TextStyle(
+                                fontFamily: 'ClashDisplay',
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400, // Regular
+                                fontStyle: FontStyle.normal,
+                              ),
                             ),
                             SizedBox(height: 2),
                             Text(
                               cityController.selectedCity.value,
-                              style: GoogleFonts.bricolageGrotesque(
+                              style: const TextStyle(
+                                fontFamily: 'ClashDisplay',
                                 color: Colors.white,
                                 fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w500, // Medium
+                                fontStyle: FontStyle.normal,
                               ),
                             ),
                           ],
@@ -138,289 +204,225 @@ class _HomePagesState extends State<HomePages> {
                 SizedBox(height: 20),
               ] else
                 SizedBox(height: 20),
-              InviteEventCard(
-                badgeText: "",
-                imageUrls: ["assets/images/image (2).png"],
-                title: "DiwaNight",
-                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
-                hostName: "Anya",
-                starImagePath: "assets/icons/Group 1 (2).png",
-                isEnded: false,
-                status: EventStatus.hostedByCurrentUser,
-                imagePath: 'assets/images/button/Frame 19976 (3).png',
-                buttonLabel: "View Request",
-                buttonVariant: LoopinButtonVariant.primary,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MainScreen(
-                        eventName: "DiwaNight",
-                        eventPrice: "₹499",
-                        confirmedUsers: 34,
-                        invitedCount: 10, // Set to > 0 to see invited list
-                        requestsCount: 10, // Set to > 0 to see requests list
-                        checkInCount: 3, // Set to > 0 to see check-in list
+              // Display events from API
+              Obx(() {
+                if (homePageController.isLoading.value) {
+                  return const Padding(
+                    padding: EdgeInsets.all(40.0),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
                   );
-                },
-              ),
-              InviteEventCard(
-                badgeText: "New Event",
-                imageUrls: ["assets/images/image (2).png"],
-                title: "Astro night",
-                dateLocation: "7 Jun 25, Bastian garden city",
-                hostName: "Anya",
-                starImagePath: "assets/icons/Group 1 (2).png",
-                isEnded: true,
-                imagePath: 'assets/images/button/Frame 19976 (4).png',
-                buttonLabel: "Send Request",
-                buttonVariant: LoopinButtonVariant.primary,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EventDetail(
-                        title: "Astro night",
-                        date: "Sunday 25, September 2009",
-                        time: "7:30 PM onwards",
-                        hostName: "Anya Dangwal",
-                        hostImage: "assets/images/ananya.png",
-                        eventImage: "assets/images/image (2).png",
-                        venue: "Bastian Garden City",
-                        fullAddress: "Basque Garden project, Mussoorie Rd, near Dehradun Zoo, Salan Gaon, Mahi, Dehradun, Guniyal Gaon, Uttarakhand 248001",
-                        aboutEvent: "SIP CLUB POP-UP: DISCO DREAM\n\nWednesday, 18th June | Bastian Garden City\nHosted by Pragya Mishra & Vrithi Manjeshwar\nTheme: Silver-Coded & Blinged to Perfection\n\nBrace yourself.\n\nStep into a mirrorball fantasy where every surface catches light and every moment sparkles with possibility. This isn't just an event—it's a portal to the most exclusive night of your life.\n\nTHE NIGHT:\n• Sequins in motion.\n• Crystals catching strobe flashes.\n• High-gloss glamour with no dimmer switch.\n• This is where the who's-who shows up and shows off.\n\nTHE SOUND:\nOn the decks - DJ GANESH, India's most iconic wedding DJ, teaming up with Yudi for an unforgettable musical journey.",
-                        badgeText: "New Event",
-                        attendeesCount: 24,
-                        attendeeImages: [
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                          "assets/images/kabir.png",
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                        ],
-                        isGoing: false,
-                        price: "₹499",
-                        starImagePath: "assets/icons/Group 1 (2).png",
-                      ),
-                    ),
-                  );
-                },
-                showButton: true,
-                showTwoButtons: true, // 👈 ab Row me 2 button aayenge
-                price:
-                    eventController.ticketPrice.value, // ✅ yahan se pass hoga
-                onFirstButtonTap: () => print("First button tapped ✅"),
-                onSecondButtonTap: () => print("Second button tapped 🎉"),
-              ),
-              InviteEventCard(
-                badgeText: "  New Invite   ",
-                imageUrls: ["assets/images/image (4).png"],
-                title: "Nirvaan",
-                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
-                hostName: "Senan",
-                starImagePath: "assets/icons/Group 1 (6).png",
-                isEnded: true,
-                imagePath: '',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EventDetail(
-                        title: "Nirvaan",
-                        date: "Saturday 7, June 2025",
-                        time: "8:00 PM onwards",
-                        hostName: "Senan",
-                        hostImage: "assets/images/avatar.png",
-                        eventImage: "assets/images/image (4).png",
-                        venue: "Bastian Garden City",
-                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
-                        aboutEvent: "Join us for an amazing evening at Nirvaan event. Experience the best of entertainment and networking in a beautiful setting.",
-                        badgeText: "  New Invite   ",
-                        attendeesCount: 15,
-                        attendeeImages: [
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                          "assets/images/kabir.png",
-                        ],
-                        isGoing: false,
-                        price: "₹300",
-                        starImagePath: "assets/icons/Group 1 (6).png",
-                      ),
-                    ),
-                  );
-                },
-                showButton: true,
-                showTwoButtons: true, // 👈 ab Row me 2 button aayenge
-                onFirstButtonTap: () => print("First button tapped ✅"),
-                onSecondButtonTap: () => print("Second button tapped 🎉"),
-              ),
-              InviteEventCard(
-                badgeText: "New Event",
-                imageUrls: ["assets/images/image (2).png"],
-                title: "Astro night",
-                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
-                hostName: "Anya",
-                starImagePath: "assets/icons/Group 1 (2).png",
-                isEnded: true,
-                imagePath: 'assets/images/button/Frame 19976 (4).png',
-                buttonLabel: "Send Request",
-                buttonVariant: LoopinButtonVariant.primary,
+                }
 
-                onTap: () {
-                  // "New Event" single button - opens EventDetail with "Send Request" button
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EventDetail(
-                        title: "Astro night",
-                        date: "Sunday 25, September 2009",
-                        time: "7:30 PM onwards",
-                        hostName: "Anya Dangwal",
-                        hostImage: "assets/images/ananya.png",
-                        eventImage: "assets/images/image (2).png",
-                        venue: "Bastian Garden City",
-                        fullAddress: "Basque Garden project,Dehradun,",
-                        aboutEvent: "SIP CLUB POP-UP: DISCO DREAM\n\nWednesday, 18th June | Bastian Garden City\nHosted by Pragya Mishra & Vrithi Manjeshwar\nTheme: Silver-Coded & Blinged to Perfection\n\nBrace yourself.\n\nStep into a mirrorball fantasy where every surface catches light and every moment sparkles with possibility. This isn't just an event—it's a portal to the most exclusive night of your life.\n\nTHE NIGHT:\n• Sequins in motion.\n• Crystals catching strobe flashes.\n• High-gloss glamour with no dimmer switch.\n• This is where the who's-who shows up and shows off.\n\nTHE SOUND:\nOn the decks - DJ GANESH, India's most iconic wedding DJ, teaming up with Yudi for an unforgettable musical journey.",
-                        badgeText: "New Event",
-                        attendeesCount: 24,
-                        attendeeImages: [
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                          "assets/images/kabir.png",
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
+                if (homePageController.errorMessage.value != null) {
+                  return Padding(
+                    padding: const EdgeInsets.all(40.0),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Text(
+                            homePageController.errorMessage.value!,
+                            style: GoogleFonts.bricolageGrotesque(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => homePageController.refreshEvents(),
+                            child: const Text('Retry'),
+                          ),
                         ],
-                        isGoing: false,
-                        price: null, // No price for single button "New Event" - will show "Send Request" button
-                        starImagePath: "assets/icons/Group 1 (2).png",
                       ),
                     ),
                   );
-                },
-              ),
-              InviteEventCard(
-                badgeText: "You're Going",
-                imageUrls: ["assets/images/gameNight.png"],
-                title: "F1 night",
-                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
-                hostName: "Anya",
-                isEnded: false,
-                imagePath: 'assets/images/button/Frame 19976 (2).png',
-                buttonLabel: "View Ticket",
-                buttonVariant: LoopinButtonVariant.primary,
-                status: EventStatus.attending, // 👈 Pass the status here
-                onTap: () {
-                  // Navigate to EventDetail - will show single button that opens BookedTicket
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EventDetail(
-                        title: "F1 night",
-                        date: "Saturday 7, June 2025",
-                        time: "8:00 PM onwards",
-                        hostName: "Anya",
-                        hostImage: "assets/images/ananya.png",
-                        eventImage: "assets/images/gameNight.png",
-                        venue: "Bastian Garden City",
-                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
-                        aboutEvent: "Join us for an exciting F1 night event. Experience the thrill of Formula 1 racing in a unique setting with fellow racing enthusiasts.",
-                        badgeText: "You're Going",
-                        attendeesCount: 20,
-                        attendeeImages: [
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                          "assets/images/kabir.png",
-                        ],
-                        isGoing: true,
-                        price: null, // No price for "You're Going" badge
-                        starImagePath: "assets/icons/Group 1 (5).png",
-                      ),
-                    ),
-                  );
-                },
-                starImagePath: "assets/icons/Group 1 (5).png",
-              ),
+                }
 
-              InviteEventCard(
-                badgeText: "Event Has Ended",
-                imageUrls: ["assets/images/image (3).png"],
-                title: "SunSet Sip",
-                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
-                hostName: "Senan",
-                starImagePath: "assets/icons/Group 1 (3).png",
-                isEnded: true,
-                imagePath: '',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EventDetail(
-                        title: "SunSet Sip",
-                        date: "Friday 6, June 2025",
-                        time: "6:00 PM onwards",
-                        hostName: "Senan",
-                        hostImage: "assets/images/avatar.png",
-                        eventImage: "assets/images/image (3).png",
-                        venue: "Bastian Garden City",
-                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
-                        aboutEvent: "A beautiful sunset event that has now ended. Thank you to all who attended this memorable evening.",
-                        badgeText: "Event Has Ended",
-                        attendeesCount: 45,
-                        attendeeImages: [
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                          "assets/images/kabir.png",
-                        ],
-                        isGoing: false,
-                        price: "₹200",
-                        starImagePath: "assets/icons/Group 1 (3).png",
+                if (homePageController.events.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.all(40.0),
+                    child: Center(
+                      child: Text(
+                        'No events available',
+                        style: GoogleFonts.bricolageGrotesque(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   );
-                },
-                showButton: false,
-              ),
-              InviteEventCard(
-                badgeText: "Deadline Has Passed",
-                imageUrls: ["assets/images/image (4).png"],
-                title: "Nirvaan",
-                dateLocation: "${_getDate48HoursBefore()}, Bastian garden city",
-                hostName: "Senan",
-                starImagePath: "assets/icons/Group 1 (4).png",
-                isEnded: true,
-                imagePath: '',
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => EventDetail(
-                        title: "Nirvaan",
-                        date: "Saturday 7, June 2025",
-                        time: "8:00 PM onwards",
-                        hostName: "Senan",
-                        hostImage: "assets/images/avatar.png",
-                        eventImage: "assets/images/image (4).png",
-                        venue: "Bastian Garden City",
-                        fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
-                        aboutEvent: "This event's registration deadline has passed. Unfortunately, you can no longer register for this event.",
-                        badgeText: "Deadline Has Passed",
-                        attendeesCount: 30,
-                        attendeeImages: [
-                          "assets/images/avatar.png",
-                          "assets/images/ananya.png",
-                          "assets/images/kabir.png",
-                        ],
-                        isGoing: false,
-                        price: "₹400",
-                        starImagePath: "assets/icons/Group 1 (4).png",
-                      ),
-                    ),
-                  );
-                },
-                showButton: false,
-              ),
+                }
+
+                return FutureBuilder<int?>(
+                  future: _getCurrentUserId(),
+                  builder: (context, snapshot) {
+                    final currentUserId = snapshot.data;
+                    
+                    // Sort events: hosted events first
+                    final sortedEvents = List<Event>.from(homePageController.events);
+                    sortedEvents.sort((a, b) {
+                      final aIsHost = currentUserId != null && a.host.id == currentUserId;
+                      final bIsHost = currentUserId != null && b.host.id == currentUserId;
+                      if (aIsHost && !bIsHost) return -1;
+                      if (!aIsHost && bIsHost) return 1;
+                      return 0;
+                    });
+                    
+                    return Column(
+                      children: sortedEvents.map((event) {
+                        // Check if current user is hosting this event
+                        final bool isUserHost = currentUserId != null && event.host.id == currentUserId;
+                        
+                        // Determine badge text based on event status
+                        final bool hasEnded = event.hasEnded;
+                        String badgeText = isUserHost && !hasEnded 
+                            ? "Your Event is Live!" 
+                            : hasEnded 
+                                ? "Event Has Ended" 
+                                : "New Event";
+                        final bool isEnded = hasEnded;
+                    
+                    // Check if request is accepted - this could be determined by:
+                    // 1. Badge text is "New Invite" (request accepted by host)
+                    // 2. Event status indicates user is attending
+                    // 3. User's request status from API (you may need to add this field)
+                    // For now, we'll check the badge text and event status
+                    final bool isRequestAccepted = badgeText == "New Invite" || 
+                        event.status.toLowerCase().contains('accepted') ||
+                        event.status.toLowerCase().contains('going') ||
+                        event.status.toLowerCase().contains('attending');
+                    
+                    // Show two buttons only when:
+                    // - Event hasn't ended AND
+                    // - (Badge is "New Invite" OR request is accepted)
+                    final bool shouldShowTwoButtons = !isEnded && 
+                        (badgeText.trim() == "New Invite" || isRequestAccepted);
+                    
+                    // Get cover images or use placeholder
+                    final List<String> imageUrls = event.coverImages.isNotEmpty
+                        ? event.coverImages
+                        : ["assets/images/image (2).png"];
+                    
+                    // Format date and location - only use venue name
+                    final String dateLocation = _formatDateLocation(
+                      event.startTime,
+                      event.location.name, // Only use venue name, not address
+                    );
+                    
+                    // Format date for EventDetail
+                    String formattedDate = '';
+                    if (event.startTime.isNotEmpty) {
+                      try {
+                        final dateTime = DateTime.parse(event.startTime);
+                        formattedDate = DateFormat('EEEE d, MMMM yyyy').format(dateTime);
+                      } catch (e) {
+                        formattedDate = '';
+                      }
+                    }
+                    
+                    // Format time for EventDetail
+                    String formattedTime = event.formattedTime;
+                    if (formattedTime.isEmpty) {
+                      formattedTime = "TBD";
+                    } else {
+                      formattedTime = "$formattedTime onwards";
+                    }
+
+                    return InviteEventCard(
+                      badgeText: badgeText,
+                      imageUrls: imageUrls,
+                      title: event.title,
+                      dateLocation: dateLocation,
+                      hostName: event.host.name,
+                      starImagePath: "assets/icons/Group 1 (2).png",
+                      isEnded: isEnded,
+                      imagePath: isEnded
+                          ? ''
+                          : 'assets/images/button/Frame 19976 (4).png',
+                      buttonLabel: isEnded 
+                          ? null 
+                          : (isUserHost ? "View Request" : "Send Request"),
+                      buttonVariant: LoopinButtonVariant.primary,
+                      showButton: !isEnded,
+                      showTwoButtons: shouldShowTwoButtons && !isUserHost, // Don't show two buttons for hosted events
+                      isPaid: event.isPaid,
+                      price: event.isPaid && event.ticketPrice != null
+                          ? event.ticketPrice
+                          : null,
+                      onUploadTap: () {
+                        // Handle upload/share icon tap
+                        print("Upload icon tapped for ${event.title}");
+                      },
+                      onTap: () {
+                        // Navigate to MainScreen for hosted events, EventDetail for others
+                        if (isUserHost && !isEnded) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MainScreen(
+                                eventName: event.title,
+                                eventPrice: event.isPaid && event.ticketPrice != null
+                                    ? "₹ ${event.ticketPrice}"
+                                    : "Free",
+                                confirmedUsers: event.goingCount,
+                                invitedCount: 0,
+                                requestsCount: event.requestsCount,
+                                checkInCount: 0,
+                              ),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EventDetail(
+                              title: event.title,
+                              date: formattedDate,
+                              time: formattedTime,
+                              hostName: event.host.name,
+                              hostImage: event.host.profileImage ??
+                                  "assets/images/avatar.png",
+                              eventImage: imageUrls.isNotEmpty
+                                  ? imageUrls[0]
+                                  : "assets/images/image (2).png",
+                              venue: event.location.name,
+                              fullAddress: event.location.address,
+                              aboutEvent: event.description,
+                              badgeText: badgeText,
+                              attendeesCount: event.goingCount,
+                              attendeeImages: const [
+                                "assets/images/avatar.png",
+                                "assets/images/ananya.png",
+                                "assets/images/kabir.png",
+                              ],
+                              isGoing: false,
+                              price: event.isPaid && event.ticketPrice != null
+                                  ? event.ticketPrice
+                                  : null,
+                              starImagePath: "assets/icons/Group 1 (2).png",
+                            ),
+                          ),
+                        );
+                        }
+                      },
+                      onFirstButtonTap: () {
+                        // Handle "Going!" button tap
+                        print("Going button tapped for ${event.title}");
+                      },
+                      onSecondButtonTap: () {
+                        // Handle "Not Going :(" button tap
+                        print("Not Going button tapped for ${event.title}");
+                      },
+                    );
+                      }).toList(),
+                    );
+                  },
+                );
+              }),
               SizedBox(height: 60),
             ],
           ),
@@ -465,9 +467,12 @@ class _HomePagesState extends State<HomePages> {
 
         child: Text(
           label,
-          style: GoogleFonts.poppins(
+          style: const TextStyle(
+            fontFamily: 'ClashDisplay',
             fontSize: 14,
-            color: isSelected ? Colors.white : Colors.grey,
+            fontWeight: FontWeight.w400, // Regular
+            fontStyle: FontStyle.normal,
+            color: Colors.white,
           ),
         ),
       ),
@@ -494,8 +499,11 @@ class _HomePagesState extends State<HomePages> {
         child: Center(
           child: Text(
             label,
-            style: GoogleFonts.poppins(
+            style: TextStyle(
+              fontFamily: 'ClashDisplay',
               fontSize: 14,
+              fontWeight: FontWeight.w400, // Regular
+              fontStyle: FontStyle.normal,
               color: isSelected ? Colors.white : Colors.grey,
             ),
           ),
