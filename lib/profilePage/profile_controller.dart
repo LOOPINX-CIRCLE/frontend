@@ -53,9 +53,16 @@ class ProfileController extends GetxController {
 
       // Load profile pictures if available
       if (profile.profilePictures.isNotEmpty) {
-        // Note: Profile pictures from API are URLs, not local files
-        // You may need to download them or handle them differently
-        // For now, we'll keep the local image management separate
+        if (kDebugMode) {
+          print('📸 Found ${profile.profilePictures.length} profile pictures:');
+          for (int i = 0; i < profile.profilePictures.length; i++) {
+            print('   $i: ${profile.profilePictures[i]}');
+          }
+        }
+      } else {
+        if (kDebugMode) {
+          print('📸 No profile pictures found in server response');
+        }
       }
 
       if (kDebugMode) {

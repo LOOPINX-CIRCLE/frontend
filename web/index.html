@@ -31,6 +31,43 @@
 
   <title>text_code</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Google Maps JavaScript API for web location services -->
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBAAPv0Z6CZUdjnphbj9XH7YR1Z2jOS684&libraries=places&callback=initMaps">
+  </script>
+  
+  <!-- Debug script to verify Google Maps API -->
+  <script>
+    function initMaps() {
+      console.log('✅ Google Maps API loaded successfully');
+      console.log('Places service available:', !!google.maps.places.AutocompleteService);
+      
+      // Test function to verify Places API works
+      window.testPlaces = function(query) {
+        console.log('🔍 Testing Places API with query:', query);
+        var service = new google.maps.places.AutocompleteService();
+        service.getPlacePredictions({
+          input: query,
+          componentRestrictions: { country: 'IN' }
+        }, function(predictions, status) {
+          console.log('📍 Places API status:', status);
+          console.log('📍 Predictions:', predictions);
+        });
+      };
+    }
+    
+    // Fallback if callback doesn't work
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+          console.log('✅ Google Maps API loaded via fallback');
+        } else {
+          console.error('❌ Google Maps API failed to load');
+        }
+      }, 2000);
+    });
+  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

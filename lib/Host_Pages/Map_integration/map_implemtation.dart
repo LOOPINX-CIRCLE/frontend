@@ -5,6 +5,9 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Host_Pages/Map_integration/api_services.dart';
+import 'package:text_code/core/config/web_config.dart';
+import 'package:text_code/core/services/web_places_service.dart';
+import 'package:text_code/core/services/web_location_service.dart';
 
 class MapController extends StatefulWidget {
   const MapController({super.key});
@@ -91,6 +94,7 @@ class _MapControllerState extends State<MapController> {
   void _onSearchChanged(String input) async {
     if (kDebugMode) {
       print("🔍 MapController _onSearchChanged called with: '$input'");
+      print("🌐 Running on web: ${WebConfig.isWeb}");
     }
     
     // Cancel previous timer
@@ -100,28 +104,65 @@ class _MapControllerState extends State<MapController> {
       setState(() => _suggestions = []);
       return;
     }
-    
-    // Only search after user stops typing for 300ms (reduced for better UX)
-    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
-      if (kDebugMode) {
-        print("🚀 MapController: Starting API call for: '$input'");
-      }
-      
-      final results = await _apiServices.fetchPlaceSuggestions(input.trim());
-      
-      if (kDebugMode) {
-        print("📍 MapController: API returned ${results.length} suggestions");
-        if (results.isNotEmpty) {
-          print("📍 First suggestion: ${results.first}");
-        } else {
-          print("⚠️ MapController: No suggestions returned from API");
+
+    // Add debounce for better performance, especially on web
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        if (kDebugMode) {
+          print("🚀 Making API call for: '$input'");
         }
-      }
-      
-      if (mounted) {
-        setState(() {
-          _suggestions = results;
-        });
+        
+        List<String> suggestions;
+        if (kIsWeb) {
+          // Use JavaScript Places API for web
+          suggestions = await WebPlacesService.fetchPlaceSuggestions(input);
+          if (kDebugMode) {
+            print("🌐 Web Places API returned: ${suggestions.length} results");
+          }
+        } else {
+          // Use regular API service for mobile
+          suggestions = await _apiServices.fetchPlaceSuggestions(input);
+          if (kDebugMode) {
+            print("📱 Mobile service returned: ${suggestions.length} results");
+          }
+        }
+        
+        if (mounted) {  // Check if widget is still mounted
+          setState(() {
+            _suggestions = suggestions;
+          });
+          
+          if (kDebugMode) {
+            print("📍 Updated UI with ${suggestions.length} suggestions");
+            if (suggestions.isEmpty && input.length >= 2) {
+              print("⚠️ No suggestions found for '$input' - check API key/CORS");
+            }
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print("💥 Error in _onSearchChanged: $e");
+          if (WebConfig.isWeb) {
+            print("🌐 Web-specific error - might be CORS or API key issue");
+          }
+        }
+        
+        if (mounted) {
+          setState(() => _suggestions = []);
+          
+          // Show user-friendly error message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Unable to fetch location suggestions${kIsWeb ? ' (Web)' : ''}. Please check your internet connection.'),
+              backgroundColor: Colors.orange,
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () => _onSearchChanged(input),
+              ),
+            ),
+          );
+        }
       }
     });
   }
@@ -132,6 +173,15 @@ class _MapControllerState extends State<MapController> {
     _focusNode.addListener(() {
       setState(() {});
     });
+    
+    // Initialize web places service if on web
+    if (kIsWeb) {
+      WebPlacesService.initialize().catchError((error) {
+        if (kDebugMode) {
+          print("Failed to initialize WebPlacesService: $error");
+        }
+      });
+    }
   }
 
   @override
@@ -335,43 +385,43 @@ class _MapControllerState extends State<MapController> {
                       itemCount: _suggestions.length,
                       padding: EdgeInsets.zero,
                       itemBuilder: (context, index) {
-                  final suggestion = _suggestions[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      border: index < _suggestions.length - 1
-                          ? Border(
-                              bottom: BorderSide(
-                                color: Colors.grey.withOpacity(0.2),
-                                width: 0.5,
+                        final suggestion = _suggestions[index];
+                        return Container(
+                          decoration: BoxDecoration(
+                            border: index < _suggestions.length - 1
+                                ? Border(
+                                    bottom: BorderSide(
+                                      color: Colors.grey.withOpacity(0.2),
+                                      width: 0.5,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            leading: const Icon(
+                              Icons.location_on,
+                              color: Colors.grey,
+                              size: 18,
+                            ),
+                            title: Text(
+                              suggestion,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 13,
                               ),
-                            )
-                          : null,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () => _selectLocation(suggestion),
+                          ),
+                        );
+                      },
                     ),
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      leading: const Icon(
-                        Icons.location_on,
-                        color: Colors.grey,
-                        size: 18,
-                      ),
-                      title: Text(
-                        suggestion,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () => _selectLocation(suggestion),
-                    ),
-                  );
-                },
-              ),
                   ),
                 ],
               ),

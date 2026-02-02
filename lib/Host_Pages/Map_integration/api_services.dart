@@ -11,7 +11,7 @@ class ApiServicesMap {
     if (kDebugMode) {
       print("🔍 fetchPlaceSuggestions called with input: '$input'");
       print("🗝️ API Key from Env: '${apiKey.isEmpty ? 'EMPTY' : 'LOADED (${apiKey.length} chars)'}");
-      print("🗝️ Full API Key: '$apiKey'");
+      print("🌐 Running on web: ${kIsWeb}");
     }
     
     if (apiKey.isEmpty) {
@@ -40,7 +40,15 @@ class ApiServicesMap {
     }
 
     try {
-      final response = await http.get(url).timeout(
+      // Add headers for web CORS compatibility
+      final Map<String, String> headers = kIsWeb 
+        ? {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          }
+        : {};
+
+      final response = await http.get(url, headers: headers).timeout(
         const Duration(seconds: 15), // Increased timeout
       );
 
@@ -80,6 +88,11 @@ class ApiServicesMap {
           if (kDebugMode) {
             print("⚠️ Google API returned status: ${data["status"]}");
             print("📌 Error message: ${data["error_message"] ?? 'No error message'}");
+            
+            // Handle common API errors for web
+            if (data["status"] == "REQUEST_DENIED") {
+              print("🚫 REQUEST_DENIED - Check API key and referrer restrictions");
+            }
           }
           return [];
         }
@@ -93,6 +106,9 @@ class ApiServicesMap {
     } catch (e) {
       if (kDebugMode) {
         print("💥 Exception in fetchPlaceSuggestions: $e");
+        if (kIsWeb) {
+          print("🌐 Web-specific error - this might be a CORS issue");
+        }
       }
       // Return empty list instead of letting exception propagate
       return [];
