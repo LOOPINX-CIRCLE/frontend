@@ -14,7 +14,7 @@ import 'package:text_code/Host_Pages/UI_Files/data_fetch_page_forreview.dart';
 import 'package:text_code/Host_Pages/UI_Files/share_screen.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
 import 'package:text_code/Reusable/text_reusable.dart';
-import 'package:text_code/core/services/event_service.dart';
+import 'package:text_code/core/services/event_create_service.dart';
 import 'package:text_code/core/constants/env.dart';
 
 class ReviewEventPage extends StatelessWidget {
@@ -545,7 +545,7 @@ class ReviewEventPage extends StatelessWidget {
                 double ticketPrice = isPaid ? double.tryParse(controllerloc.ticketPrice.value) ?? 0.0 : 0.0;
 
                 // Call event creation API
-                final eventService = EventService();
+                final eventService = EventCreateService();
                 final result = await eventService.createEvent(
                   title: controllerloc.eventTitle.value,
                   description: controllerloc.description.value,

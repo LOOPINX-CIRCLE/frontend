@@ -5,7 +5,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:flutter/foundation.dart';
 import 'package:text_code/core/services/auth_service.dart';
 
-class EventService {
+class EventCreateService {
   static const String _baseUrl = 'https://loopinbackend-g17e.onrender.com/api/events';
 
   Future<Map<String, dynamic>> createEvent({
