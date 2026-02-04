@@ -31,11 +31,30 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 80, // Reduce quality for better performance
+        imageQuality: 60, // Reduced quality for better performance and smaller file size
+        maxWidth: 1200, // Limit max width to reduce file size
+        maxHeight: 1200, // Limit max height to reduce file size
       );
       
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
+        
+        // Check file size (limit to 2MB per image to prevent timeouts)
+        const maxFileSize = 2 * 1024 * 1024; // 2MB
+        if (bytes.length > maxFileSize) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Image is too large (${(bytes.length / 1024 / 1024).toStringAsFixed(2)}MB). Please select a smaller image or the system will compress it.'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+          
+          // Still proceed but warn the user - server will handle compression
+        }
+        
         setState(() {
           _selectedImages[index] = File(pickedFile.path);
           _imageBytes[index] = bytes;
@@ -46,12 +65,14 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
     } catch (e) {
       print('Error picking image: $e');
       // Show error message to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error picking image: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -123,12 +144,40 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
       return;
     }
 
-    // Show loading indicator
+    // Show loading indicator with better UX
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+      builder: (context) => PopScope(
+        canPop: false, // Prevent back button during upload
+        child: AlertDialog(
+          backgroundColor: Colors.black87,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Colors.white),
+              const SizedBox(height: 16),
+              Text(
+                'Uploading profile images...',
+                style: GoogleFonts.bricolageGrotesque(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This may take a few minutes.\nPlease don\'t close the app.',
+                style: GoogleFonts.bricolageGrotesque(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
 
@@ -195,16 +244,44 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         print('Profile Pictures: ${imageData.length} file(s)');
       }
 
-      // Call complete profile API with multipart upload
-      final response = await authService.completeProfileMultipart(
-        token: token,
-        phoneNumber: userController.fullMobileNumber,
-        name: userController.userName.value.trim(),
-        birthDate: userController.formattedBirthDate,
-        gender: userController.formattedGender,
-        eventInterests: userController.eventInterests.toList(),
-        profilePictures: imageData,
-      );
+      // Call complete profile API with multipart upload (with retry mechanism)
+      late Map<String, dynamic> response; // Use 'late' keyword instead of uninitialized variable
+      int maxRetries = 2;
+      int currentRetry = 0;
+      
+      while (currentRetry <= maxRetries) {
+        try {
+          if (kDebugMode && currentRetry > 0) {
+            print('Retrying upload... Attempt ${currentRetry + 1}/${maxRetries + 1}');
+          }
+          
+          response = await authService.completeProfileMultipart(
+            token: token,
+            phoneNumber: userController.fullMobileNumber,
+            name: userController.userName.value.trim(),
+            birthDate: userController.formattedBirthDate,
+            gender: userController.formattedGender,
+            eventInterests: userController.eventInterests.toList(),
+            profilePictures: imageData,
+          );
+          break; // Success - exit retry loop
+          
+        } catch (e) {
+          currentRetry++;
+          if (currentRetry > maxRetries) {
+            // Final attempt failed - rethrow the error
+            rethrow;
+          }
+          
+          if (kDebugMode) {
+            print('Upload failed (attempt $currentRetry): $e');
+            print('Retrying in 2 seconds...');
+          }
+          
+          // Wait before retry
+          await Future.delayed(const Duration(seconds: 2));
+        }
+      }
 
       if (!mounted) return;
 
