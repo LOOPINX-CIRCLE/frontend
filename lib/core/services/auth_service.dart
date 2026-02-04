@@ -366,7 +366,7 @@ class AuthService {
         headers: {
           'Authorization': 'Bearer $token',
         },
-        timeout: ApiConstants.defaultTimeout,
+        timeout: ApiConstants.imageUploadTimeout, // Use longer timeout for image uploads
       );
 
       if (kDebugMode) {

@@ -56,7 +56,7 @@ class Event {
       description: json['description'] as String? ?? '',
       host: json['host'] != null
           ? EventHost.fromJson(json['host'] as Map<String, dynamic>)
-          : EventHost(id: 0, name: '', phoneNumber: ''),
+          : EventHost(id: 0, userId: 0, name: '', phoneNumber: ''),
       location: json['location'] != null
           ? EventLocation.fromJson(json['location'] as Map<String, dynamic>)
           : EventLocation(name: '', address: '', latitude: 0.0, longitude: 0.0),
@@ -170,12 +170,14 @@ class Event {
 /// Model for Event Host
 class EventHost {
   final int id;
+  final int userId; // Add user_id field
   final String name;
   final String phoneNumber;
   final String? profileImage;
 
   EventHost({
     required this.id,
+    required this.userId,
     required this.name,
     required this.phoneNumber,
     this.profileImage,
@@ -184,8 +186,9 @@ class EventHost {
   factory EventHost.fromJson(Map<String, dynamic> json) {
     return EventHost(
       id: json['id'] is int ? json['id'] as int : int.parse(json['id'].toString()),
+      userId: json['user_id'] is int ? json['user_id'] as int : int.parse(json['user_id'].toString()),
       name: json['name'] as String? ?? '',
-      phoneNumber: json['phone_number'] as String? ?? '',
+      phoneNumber: json['username'] as String? ?? '', // API uses 'username' for phone number
       profileImage: json['profile_image']?.toString(),
     );
   }
@@ -193,8 +196,9 @@ class EventHost {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'user_id': userId,
       'name': name,
-      'phone_number': phoneNumber,
+      'username': phoneNumber, // API expects 'username' for phone number
       'profile_image': profileImage,
     };
   }

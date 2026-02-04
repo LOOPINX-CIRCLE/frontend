@@ -56,7 +56,17 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Check if the widget is still in the tree before navigating
     if (mounted) {
-      await _checkAutoLogin();
+      // Always navigate to mobile number page (skip auto-login)
+      Navigator.pushReplacement(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const MobileNo(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
+      );
     }
   }
 

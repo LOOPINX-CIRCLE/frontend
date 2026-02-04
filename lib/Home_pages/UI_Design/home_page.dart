@@ -20,6 +20,7 @@ import 'package:text_code/Home_pages/UI_Design/eventdetail.dart';
 import 'package:text_code/HostManagement/mainScreen.dart';
 import 'package:text_code/core/utils/jwt_utils.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
+import 'package:text_code/core/services/event_request_service.dart';
 
 class HomePages extends StatefulWidget {
   const HomePages({super.key, this.showTabs = true, this.tabIndex, this.onTabChanged});
@@ -43,6 +44,7 @@ class _HomePagesState extends State<HomePages> {
 
   final CapacityController capacityController = Get.put(CapacityController());
   final SecureStorageService _secureStorage = SecureStorageService();
+  final EventRequestService _eventRequestService = EventRequestService();
   int? _currentUserId;
   int selectedIndex = 0;
   
@@ -52,18 +54,102 @@ class _HomePagesState extends State<HomePages> {
 
   /// Get current user ID from token
   Future<int?> _getCurrentUserId() async {
-    if (_currentUserId != null) return _currentUserId;
+    if (_currentUserId != null) {
+      if (kDebugMode) {
+        print('_getCurrentUserId: returning cached value: $_currentUserId');
+      }
+      return _currentUserId;
+    }
     
     try {
       final token = await _secureStorage.getToken();
+      if (kDebugMode) {
+        print('_getCurrentUserId: token exists: ${token != null}');
+      }
       if (token != null) {
         _currentUserId = JwtUtils.getUserId(token);
+        if (kDebugMode) {
+          print('_getCurrentUserId: extracted user ID: $_currentUserId');
+        }
         return _currentUserId;
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error getting current user ID: $e');
       }
+    }
+    if (kDebugMode) {
+      print('_getCurrentUserId: returning null');
+    }
+    return null;
+  }
+
+  /// Check if current user is hosting the event (using both ID and phone number)
+  bool _isUserHostingEvent(Event event, int? currentUserId, String? currentUserPhoneNumber) {
+    if (kDebugMode) {
+      print('_isUserHostingEvent check for ${event.title}:');
+      print('  Event Host Profile ID: ${event.host.id}');
+      print('  Event Host User ID: ${event.host.userId}, Current User ID: $currentUserId');
+      print('  Event Host Phone: "${event.host.phoneNumber}", Current User Phone: "$currentUserPhoneNumber"');
+    }
+    
+    // Primary check: Match by user ID (most reliable)
+    // Compare with host.user_id, not host.id
+    if (currentUserId != null && event.host.userId == currentUserId) {
+      if (kDebugMode) {
+        print('  -> Match by User ID: TRUE (User is hosting this event)');
+      }
+      return true;
+    }
+    
+    // Fallback: If ID doesn't match, try matching by phone number
+    if (currentUserPhoneNumber != null && 
+        currentUserPhoneNumber.isNotEmpty && 
+        event.host.phoneNumber.isNotEmpty) {
+      
+      // Normalize phone numbers for comparison (remove spaces, dashes, etc.)
+      final normalizedCurrentPhone = currentUserPhoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+      final normalizedHostPhone = event.host.phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+      
+      if (kDebugMode) {
+        print('  -> Normalized Current: "$normalizedCurrentPhone", Host: "$normalizedHostPhone"');
+      }
+      
+      if (normalizedCurrentPhone == normalizedHostPhone) {
+        if (kDebugMode) {
+          print('  -> Match by Phone: TRUE (User is hosting this event)');
+        }
+        return true;
+      }
+    }
+    
+    if (kDebugMode) {
+      print('  -> No Match: FALSE (User is NOT hosting this event)');
+    }
+    return false;
+  }
+
+  /// Get current user phone number from token
+  Future<String?> _getCurrentUserPhoneNumber() async {
+    try {
+      final token = await _secureStorage.getToken();
+      if (kDebugMode) {
+        print('_getCurrentUserPhoneNumber: token exists: ${token != null}');
+      }
+      if (token != null) {
+        final phoneNumber = JwtUtils.getPhoneNumber(token);
+        if (kDebugMode) {
+          print('_getCurrentUserPhoneNumber: extracted phone: "$phoneNumber"');
+        }
+        return phoneNumber;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting current user phone number: $e');
+      }
+    }
+    if (kDebugMode) {
+      print('_getCurrentUserPhoneNumber: returning null');
     }
     return null;
   }
@@ -80,6 +166,82 @@ class _HomePagesState extends State<HomePages> {
     final now = DateTime.now();
     final date48HoursBefore = now.subtract(const Duration(hours: 48));
     return DateFormat('d MMM yy').format(date48HoursBefore);
+  }
+
+  /// Send request to join an event
+  Future<void> _sendEventRequest(Event event, BuildContext context) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+
+      if (kDebugMode) {
+        print('Sending request for event ID: ${event.id}');
+      }
+
+      // Send the request
+      final response = await _eventRequestService.sendEventRequest(
+        eventId: event.id,
+        message: "I would love to attend this event!",
+        seatsRequested: 1,
+      );
+
+      // Close loading dialog
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (kDebugMode) {
+        print('Event request sent successfully: ${response['id']}');
+      }
+
+      // Show success message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Request sent successfully! 🎉'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Refresh events to update UI
+      homePageController.refreshEvents();
+
+    } catch (e) {
+      // Close loading dialog
+      if (context.mounted) Navigator.of(context).pop();
+
+      if (kDebugMode) {
+        print('Error sending event request: $e');
+        print('Error type: ${e.runtimeType}');
+      }
+
+      // Extract meaningful error message
+      String errorMessage = e.toString();
+      
+      // Remove "ApiException: " prefix if present
+      if (errorMessage.startsWith('ApiException: ')) {
+        errorMessage = errorMessage.substring('ApiException: '.length);
+      }
+
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -257,25 +419,66 @@ class _HomePagesState extends State<HomePages> {
                   );
                 }
 
-                return FutureBuilder<int?>(
-                  future: _getCurrentUserId(),
+                return FutureBuilder<Map<String, dynamic>>(
+                  future: Future.wait([
+                    _getCurrentUserId(),
+                    _getCurrentUserPhoneNumber(),
+                  ]).then((results) => {
+                    'userId': results[0],
+                    'phoneNumber': results[1],
+                  }),
                   builder: (context, snapshot) {
-                    final currentUserId = snapshot.data;
+                    if (kDebugMode) {
+                      print('FutureBuilder snapshot: ${snapshot.connectionState}');
+                      print('Snapshot data: ${snapshot.data}');
+                      print('Snapshot error: ${snapshot.error}');
+                    }
                     
-                    // Sort events: hosted events first
+                    // Show loading while waiting for user data
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      );
+                    }
+                    
+                    final currentUserId = snapshot.data?['userId'] as int?;
+                    final currentUserPhoneNumber = snapshot.data?['phoneNumber'] as String?;
+                    
+                    if (kDebugMode) {
+                      print('Current User - ID: $currentUserId, Phone: "$currentUserPhoneNumber"');
+                    }
+                    
+                    // Sort events: User's hosted events first (by latest ID), then others by latest event ID
                     final sortedEvents = List<Event>.from(homePageController.events);
                     sortedEvents.sort((a, b) {
-                      final aIsHost = currentUserId != null && a.host.id == currentUserId;
-                      final bIsHost = currentUserId != null && b.host.id == currentUserId;
+                      final aIsHost = _isUserHostingEvent(a, currentUserId, currentUserPhoneNumber);
+                      final bIsHost = _isUserHostingEvent(b, currentUserId, currentUserPhoneNumber);
+                      
+                      // If one is hosted by user and other is not, prioritize hosted
                       if (aIsHost && !bIsHost) return -1;
                       if (!aIsHost && bIsHost) return 1;
-                      return 0;
+                      
+                      // Both are hosted by user - sort by latest event ID first (highest ID = latest)
+                      if (aIsHost && bIsHost) {
+                        return b.id.compareTo(a.id); // Latest ID first
+                      }
+                      
+                      // Both are NOT hosted by user - sort by latest event ID
+                      return b.id.compareTo(a.id); // Latest event ID first
                     });
                     
                     return Column(
                       children: sortedEvents.map((event) {
-                        // Check if current user is hosting this event
-                        final bool isUserHost = currentUserId != null && event.host.id == currentUserId;
+                        // Check if current user is hosting this event (using both ID and phone number)
+                        final bool isUserHost = _isUserHostingEvent(event, currentUserId, currentUserPhoneNumber);
+                        
+                        // Debug logging
+                        if (kDebugMode) {
+                          print('Event: ${event.title}');
+                          print('  Host ID: ${event.host.id}, Current User ID: $currentUserId');
+                          print('  Host Phone: ${event.host.phoneNumber}, Current User Phone: $currentUserPhoneNumber');
+                          print('  Is User Host: $isUserHost');
+                        }
                         
                         // Determine badge text based on event status
                         final bool hasEnded = event.hasEnded;
@@ -343,9 +546,17 @@ class _HomePagesState extends State<HomePages> {
                       imagePath: isEnded
                           ? ''
                           : 'assets/images/button/Frame 19976 (4).png',
-                      buttonLabel: isEnded 
-                          ? null 
-                          : (isUserHost ? "View Request" : "Send Request"),
+                      buttonLabel: (() {
+                        final buttonText = isEnded 
+                            ? null 
+                            : (isUserHost ? "View Request" : "Send Request");
+                        if (kDebugMode) {
+                          print('Button for ${event.title}: $buttonText (isUserHost: $isUserHost, isEnded: $isEnded)');
+                          print('  Event Host ID: ${event.host.id}, Phone: ${event.host.phoneNumber}');
+                          print('  Current User ID: $currentUserId, Phone: $currentUserPhoneNumber');
+                        }
+                        return buttonText;
+                      })(),
                       buttonVariant: LoopinButtonVariant.primary,
                       showButton: !isEnded,
                       showTwoButtons: shouldShowTwoButtons && !isUserHost, // Don't show two buttons for hosted events
@@ -358,8 +569,23 @@ class _HomePagesState extends State<HomePages> {
                         print("Upload icon tapped for ${event.title}");
                       },
                       onTap: () {
-                        // Navigate to MainScreen for hosted events, EventDetail for others
-                        if (isUserHost && !isEnded) {
+                        if (kDebugMode) {
+                          print('Event tapped: ${event.title}');
+                          print('  isUserHost: $isUserHost, isEnded: $isEnded');
+                          print('  Button label: ${isEnded ? null : (isUserHost ? "View Request" : "Send Request")}');
+                        }
+                        
+                        // Handle different button actions
+                        if (isEnded) {
+                          // No action for ended events
+                          return;
+                        }
+                        
+                        if (isUserHost) {
+                          // Navigate to MainScreen for hosted events
+                          if (kDebugMode) {
+                            print('Navigating to MainScreen for hosted event: ${event.title}');
+                          }
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -376,37 +602,11 @@ class _HomePagesState extends State<HomePages> {
                             ),
                           );
                         } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EventDetail(
-                              title: event.title,
-                              date: formattedDate,
-                              time: formattedTime,
-                              hostName: event.host.name,
-                              hostImage: event.host.profileImage ??
-                                  "assets/images/avatar.png",
-                              eventImage: imageUrls.isNotEmpty
-                                  ? imageUrls[0]
-                                  : "assets/images/image (2).png",
-                              venue: event.location.name,
-                              fullAddress: event.location.address,
-                              aboutEvent: event.description,
-                              badgeText: badgeText,
-                              attendeesCount: event.goingCount,
-                              attendeeImages: const [
-                                "assets/images/avatar.png",
-                                "assets/images/ananya.png",
-                                "assets/images/kabir.png",
-                              ],
-                              isGoing: false,
-                              price: event.isPaid && event.ticketPrice != null
-                                  ? event.ticketPrice
-                                  : null,
-                              starImagePath: "assets/icons/Group 1 (2).png",
-                            ),
-                          ),
-                        );
+                          // Send request for non-hosted events
+                          if (kDebugMode) {
+                            print('Sending request for event: ${event.title}');
+                          }
+                          _sendEventRequest(event, context);
                         }
                       },
                       onFirstButtonTap: () {
