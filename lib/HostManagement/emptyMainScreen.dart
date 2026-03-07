@@ -25,6 +25,13 @@ class EmptyMainScreen extends StatefulWidget {
 
 class _EmptyMainScreenState extends State<EmptyMainScreen> {
   @override
+  void initState() {
+    super.initState();
+    // Clear previous event's check-in state when opening a new event
+    TabContentUI.clearCheckedInUsers();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF101010),
@@ -68,16 +75,10 @@ class _EmptyMainScreenState extends State<EmptyMainScreen> {
               subText: 'Guests who check in at your event will appear here.',
               buttonText: 'View Guest List ',
               onButtonTap: () {
-                // Close empty state and open check-in cards
+                // Close empty state and open confirmed guests in normal mode
                 Navigator.pop(context);
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => EventConfirmed(
-                    users: TabContentUI.getConfirmedUsers(),
-                    isCheckInMode: true, // Enable check-in mode
-                  ),
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('No eventId available to load guests')),
                 );
               },
             );
@@ -103,6 +104,8 @@ class _EmptyMainScreenState extends State<EmptyMainScreen> {
               confirmedGuests: 0,
               eventPrice: widget.eventPrice,
               isCheckInActive: false, // Empty screen, so check-in is never active
+              eventStatus: 'planned', // Empty event has planned status
+              onRefreshCounts: null, // No refresh needed for empty screen
             );
           },
           onSentInvitesTap: () {

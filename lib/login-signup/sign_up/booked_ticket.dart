@@ -81,6 +81,7 @@ class _BookedTicketState extends State<BookedTicket> {
                   code: ticket.code,
                   invites: ticket.invites,
                   buttonImage: ticket.buttonImage,
+                  eventId: ticket.eventId,
                 )).toList(),
               )),
               // Static tickets (can be kept for demo)
@@ -138,6 +139,7 @@ class TicketCard extends StatelessWidget {
   final String code;
   final String? invites; // optional invite badge
   final String? buttonImage; // 👈 new param for button
+  final int? eventId; // Event ID for share functionality
 
   const TicketCard({
     super.key,
@@ -148,6 +150,7 @@ class TicketCard extends StatelessWidget {
     required this.location,
     required this.code,
     this.invites,
+    this.eventId,
     this.buttonImage,
   });
 
@@ -330,7 +333,7 @@ class TicketCard extends StatelessWidget {
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => Invite()),
+          MaterialPageRoute(builder: (context) => Invite(eventId: eventId ?? 0)),
         );
       },
       child: Image.asset(

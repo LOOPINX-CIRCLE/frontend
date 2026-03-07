@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
+import 'package:text_code/core/utils/image_url_helper.dart';
 
 class EventInvited extends StatelessWidget {
   final List<User> users;
@@ -128,7 +129,11 @@ class EventInvited extends StatelessWidget {
                         children: [
                           CircleAvatar(
                             radius: 24,
-                            backgroundImage: AssetImage(user.imagePath),
+                            backgroundColor: Colors.grey[700],
+                            backgroundImage: (user.imagePath.startsWith('assets'))
+                                ? AssetImage(user.imagePath) as ImageProvider
+                                : NetworkImage(imageUrl(user.imagePath)),
+                            onBackgroundImageError: (error, stackTrace) {},
                           ),
                           const SizedBox(width: 12),
                           Expanded(

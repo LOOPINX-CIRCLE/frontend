@@ -65,14 +65,15 @@ class CapacityController extends GetxController {
       gstOnBasePerTicket;
 
   int get totalAmountCollected =>
-      ticketPrice.value * capacity.value + totalPlatformFeeCollected.toInt();
+      (guestPaysPerTicket * capacity.value).toInt();
 
   double get totalPlatformFeeCollected =>
       platformFeeIncludingGSTPerTicket * capacity.value;
   double get totalGSTCollected =>
-      hasGSTNumber.value ? (totalAmountCollected * gstPercent / 100.0) : 0.0;
+      hasGSTNumber.value ? (basePricePerTicket * capacity.value * gstPercent / 100.0) : 0.0;
 
-  double get estimatedEarnings => basePricePerTicket * capacity.value;
+  double get estimatedEarnings =>
+      (basePricePerTicket + gstOnBasePerTicket) * capacity.value;
 
   // ------------------- Methods -------------------
   void resetFields() {

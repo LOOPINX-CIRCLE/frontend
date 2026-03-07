@@ -344,22 +344,37 @@ class CapactiyPage extends StatelessWidget {
           ),
           SizedBox(height: 10),
           _row(
-            "Total amount",
-            "₹${controller.totalAmountCollected.toStringAsFixed(2)}",
+            "Base price per ticket",
+            "₹${controller.basePricePerTicket.toStringAsFixed(2)}",
           ),
           _row(
-            "Guest platform fee \n10%(including 18% GST)",
-            "- ₹${controller.totalPlatformFeeCollected.toStringAsFixed(2)}",
+            "GST on base (18%)",
+            "+ ₹${controller.gstOnBasePerTicket.toStringAsFixed(2)}",
           ),
           _row(
-            "GST Collected",
-            "₹${controller.totalGSTCollected.toStringAsFixed(2)}",
+            "You get per ticket",
+            "₹${(controller.basePricePerTicket + controller.gstOnBasePerTicket).toStringAsFixed(2)}",
+          ),
+          SizedBox(height: 10),
+          _row(
+            "× Capacity",
+            "× ${controller.capacity.value}",
           ),
           Divider(color: Colors.white24),
           _row(
-            "Estimate earning",
+            "Your total earnings",
             "₹${controller.estimatedEarnings.toStringAsFixed(2)}",
             isBold: true,
+          ),
+          SizedBox(height: 16),
+          Center(
+            child: Text(
+              "Platform fee (10% + 18% GST) goes to Loopin",
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
+            ),
           ),
         ],
       ),

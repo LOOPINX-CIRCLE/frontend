@@ -18,13 +18,15 @@ class SecureStorageService {
   /// Store authentication token securely
   Future<void> saveToken(String token) async {
     try {
-      await _storage.write(key: _tokenKey, value: token);
+      // ✅ Ensure no whitespace in stored token
+      final cleanToken = token.trim();
+      await _storage.write(key: _tokenKey, value: cleanToken);
       if (kDebugMode) {
-        print('Token saved securely');
+        print('✅ Token saved securely (length: ${cleanToken.length})');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error saving token: $e');
+        print('❌ Error saving token: $e');
       }
       rethrow;
     }

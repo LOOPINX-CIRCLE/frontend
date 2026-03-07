@@ -21,6 +21,7 @@ import 'package:text_code/HostManagement/mainScreen.dart';
 import 'package:text_code/core/utils/jwt_utils.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
 import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/utils/image_url_helper.dart';
 
 class HomePages extends StatefulWidget {
   const HomePages({super.key, this.showTabs = true, this.tabIndex, this.onTabChanged});
@@ -507,7 +508,7 @@ class _HomePagesState extends State<HomePages> {
                     
                     // Get cover images or use placeholder
                     final List<String> imageUrls = event.coverImages.isNotEmpty
-                        ? event.coverImages
+                        ? event.coverImages.map((url) => imageUrl(url)).toList()
                         : ["assets/images/image (2).png"];
                     
                     // Format date and location - only use venue name
@@ -598,6 +599,8 @@ class _HomePagesState extends State<HomePages> {
                                 invitedCount: 0,
                                 requestsCount: event.requestsCount,
                                 checkInCount: 0,
+                                eventId: event.id, // Pass event ID for real-time data
+                                eventStatus: event.status, // Pass event status
                               ),
                             ),
                           );

@@ -584,9 +584,28 @@ class ReviewEventPage extends StatelessWidget {
                   }
                 }
 
-                // Determine if event is paid (currently defaulting to free)
-                bool isPaid = false; // Future: Add UI toggle for paid/free events
-                double ticketPrice = isPaid ? double.tryParse(controllerloc.ticketPrice.value) ?? 0.0 : 0.0;
+                // Determine if event is paid by checking if ticketPrice is set and not "Free" or "0"
+                final priceStr = controllerloc.ticketPrice.value.trim();
+                bool isPaid = priceStr.isNotEmpty && priceStr != "Free" && priceStr != "0";
+                double basePricePerTicket = isPaid ? double.tryParse(priceStr) ?? 0.0 : 0.0;
+
+                // Calculate 10% platform fee with 18% GST
+                double platformFee = 0.0;
+                double platformFeeWithGST = 0.0;
+                if (isPaid && basePricePerTicket > 0) {
+                  platformFee = basePricePerTicket * 0.10; // 10% platform fee
+                  platformFeeWithGST = platformFee * 1.18; // Add 18% GST on fee
+                }
+                
+                // Final guest pays uses the base price (backend will add GST breakdown)
+                double ticketPrice = basePricePerTicket;
+
+                if (kDebugMode) {
+                  print('💰 Event Pricing - isPaid: $isPaid, basePriceStr: "$priceStr"');
+                  print('💰 Base Price: ₹$basePricePerTicket');
+                  print('💰 Platform Fee (10%): ₹$platformFee');
+                  print('💰 Platform Fee with GST (18%): ₹$platformFeeWithGST');
+                }
 
                 // Call event creation API
                 final eventService = EventCreateService();
@@ -605,6 +624,7 @@ class ReviewEventPage extends StatelessWidget {
                   maxCapacity: int.tryParse(controllerloc.capacity.value) ?? 0,
                   isPaid: isPaid,
                   ticketPrice: ticketPrice,
+                  platformFee: platformFee,
                   allowPlusOne: true, // Set as needed
                   gstNumber: "", // Set as needed
                   allowedGenders: "all", // Set as needed
@@ -613,9 +633,20 @@ class ReviewEventPage extends StatelessWidget {
                   eventInterestIds: "[]", // Empty array for now
                   coverImages: serviceImages, // Use properly formatted images
                 );
+                
+                // Extract event ID from response
+                int eventId = 0;
+                if (result.containsKey('id')) {
+                  eventId = result['id'] is int ? result['id'] as int : int.tryParse(result['id'].toString()) ?? 0;
+                  if (kDebugMode) {
+                    print('✅ Event created with ID: $eventId');
+                  }
+                }
+                
                 Navigator.of(context).pop(); // Close loading
                 Get.snackbar('Success', 'Event posted successfully!', backgroundColor: Colors.green, colorText: Colors.white);
-                // Navigate to share screen
+                
+                // Navigate to share screen with event ID
                 Widget imageToSend;
                 if (controller.images.isNotEmpty && controller.images[0].path.isNotEmpty) {
                   if (kIsWeb) {
@@ -637,7 +668,7 @@ class ReviewEventPage extends StatelessWidget {
                   imageToSend = Image.asset(controller.defaultAssetImage);
                 }
                 controllerloc.resetEventData();
-                Get.offAll(ShareScreen(imageWidget: imageToSend));
+                Get.offAll(ShareScreen(imageWidget: imageToSend, eventId: eventId));
               } catch (e) {
                 Navigator.of(context).pop(); // Close loading
                 String errorMessage = e.toString();

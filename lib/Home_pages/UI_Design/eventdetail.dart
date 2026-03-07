@@ -10,6 +10,7 @@ import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Reusable/loopin_cta_button.dart';
 import 'package:text_code/core/constants/env.dart';
 import 'package:text_code/Reusable/smart_image.dart';
+import 'package:text_code/core/utils/image_url_helper.dart';
 
 
 class EventDetail extends StatefulWidget {
@@ -57,12 +58,12 @@ class _EventDetailState extends State<EventDetail> {
 
   String _resolveEventImage() {
     if (widget.eventImage.isNotEmpty) {
-      return widget.eventImage;
+      return imageUrl(widget.eventImage);
     }
     try {
       final eventController = Get.find<EventController>();
       if (eventController.eventImage.value.isNotEmpty) {
-        return eventController.eventImage.value;
+        return imageUrl(eventController.eventImage.value);
       }
     } catch (_) {}
     if (widget.title.toLowerCase().contains("f1")) {

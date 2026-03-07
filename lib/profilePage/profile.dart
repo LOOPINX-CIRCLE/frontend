@@ -10,6 +10,10 @@ import 'package:get/get.dart';
 import 'profile_controller.dart';
 import 'termsCondition.dart';
 import 'PrivacyPolicy.dart';
+import 'package:text_code/core/services/notification_service.dart';
+import 'package:text_code/core/services/auth_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:text_code/core/utils/image_url_helper.dart';
 
 class ProfilePage extends StatefulWidget {
   final bool hasHomePagesAccess;
@@ -125,7 +129,7 @@ class _ProfilePageState extends State<ProfilePage> {
       return ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: Image.network(
-          serverImages.first, // Use the first server image as profile picture
+          imageUrl(serverImages.first), // Use helper to resolve URL
           width: 116,
           height: 112,
           fit: BoxFit.cover,
@@ -210,26 +214,24 @@ class _ProfilePageState extends State<ProfilePage> {
     final localImage = _profileController.uploadedImages[index];
     final localBytes = _profileController.imageBytes[index];
     
-    // Determine what to show: server image first, then local image, then empty slot
+    // Determine what to show
     Widget imageWidget;
     bool showDeleteButton = false;
     
-    if (index < serverImages.length) {
-      // Show server image
+    // Skip the first server image since it's used as profile picture
+    final adjustedServerImageIndex = index + 1;
+    
+    if (adjustedServerImageIndex < serverImages.length) {
+      // Show server image (starting from index 1, skipping the profile pic)
       imageWidget = Image.network(
-        serverImages[index],
+        imageUrl(serverImages[adjustedServerImageIndex]), // Use helper to resolve URL
         width: 200,
         height: 200,
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) {
           if (kDebugMode) {
-            print('Error loading server image at index $index: $error');
+            print('Error loading server image at index $adjustedServerImageIndex: $error');
           }
-          // If server image fails and we have local image, show local
-          if (localImage != null) {
-            return _buildLocalImageWidget(localImage, localBytes);
-          }
-          // Otherwise show placeholder
           return _buildEmptyImageSlot();
         },
         loadingBuilder: (context, child, loadingProgress) {
@@ -247,13 +249,11 @@ class _ProfilePageState extends State<ProfilePage> {
           );
         },
       );
-    } else if (localImage != null) {
-      // Show local image if no server image at this index
-      imageWidget = _buildLocalImageWidget(localImage, localBytes);
-      showDeleteButton = !hasMaxImages; // Allow deletion of local images
+      showDeleteButton = false;
     } else {
       // Show empty slot
       imageWidget = _buildEmptyImageSlot();
+      showDeleteButton = false;
     }
 
     return Container(
@@ -282,6 +282,55 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGalleryImageItem(int serverImageIndex) {
+    final serverImages = _profileController.profilePictureUrls;
+    
+    // Show server image at the given index
+    if (serverImageIndex < serverImages.length) {
+      return Container(
+        margin: const EdgeInsets.only(right: 12),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Image.network(
+            imageUrl(serverImages[serverImageIndex]), // Use helper to resolve URL
+            width: 200,
+            height: 200,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              if (kDebugMode) {
+                print('Error loading gallery image at index $serverImageIndex: $error');
+              }
+              return _buildEmptyImageSlot();
+            },
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+    
+    // Show empty slot if image doesn't exist
+    return Container(
+      margin: const EdgeInsets.only(right: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: _buildEmptyImageSlot(),
       ),
     );
   }
@@ -433,64 +482,57 @@ class _ProfilePageState extends State<ProfilePage> {
 
                     const SizedBox(height: 16),
 
-                    // Edit Photos Section
+                    // Edit Photos Section (disabled - button visible but no function)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          GestureDetector(
-                            onTap: _editPhotos,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Image.asset(
+                                  'assets/icons/Gallery Edit.png',
                                   width: 24,
                                   height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[800],
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Image.asset(
-                                    'assets/icons/Gallery Edit.png',
-                                    width: 24,
-                                    height: 24,
-                                    // optional tint, similar to icon color
-                                  ),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Edit photos",
-                                  style: GoogleFonts.bricolageGrotesque(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Edit photos",
+                                style: GoogleFonts.bricolageGrotesque(
+                                  color: Colors.white,
+                                  fontSize: 14,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
 
                     const SizedBox(height: 16),
-
-              
                     SizedBox(
                       height: 200,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: 6, // Show all 6 slots including server images
+                        itemCount: 6, // Show 6 gallery slots with empty ones
                         itemBuilder: (context, index) {
+                          // Map to server images starting from index 1 (skip profile pic at 0)
+                          int serverImageIndex = index + 1;
                           return Padding(
                             padding: EdgeInsets.only(
                               right: index < 5 ? 12 : 0,
                             ),
-                            child: GestureDetector(
-                              onTap: () => _pickAndAddImage(index),
-                              child: _buildImageItem(index, true),
-                            ),
+                            child: _buildGalleryImageItem(serverImageIndex),
                           );
                         },
                       ),
@@ -605,7 +647,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
         ],
-      );
+        );
       }), // Close Obx wrapper
     );
   }
@@ -754,10 +796,47 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           TextButton(
-            onPressed: () {
-              // Handle logout
+            onPressed: () async {
+              // Dismiss the dialog
               Navigator.pop(context);
-              Navigator.pop(context);
+              
+              try {
+                // Deactivate device for push notifications
+                final prefs = await SharedPreferences.getInstance();
+                final playerId = prefs.getString('onesignal_player_id');
+                
+                if (playerId != null && playerId.isNotEmpty) {
+                  if (kDebugMode) {
+                    print('📱 Deactivating push notification device...');
+                  }
+                  final notificationService = NotificationDeviceService();
+                  await notificationService.deactivateDevice(oneSignalPlayerId: playerId);
+                }
+                
+                // Clear stored player ID
+                await prefs.remove('onesignal_player_id');
+                
+                // Clear auth token
+                final authService = AuthService();
+                await authService.logout();
+                
+                if (kDebugMode) {
+                  print('✅ Device deactivated and user logged out');
+                }
+                
+                // Navigate to phone number page
+                // Adjust route name based on your app's navigation
+                Get.offAllNamed('/login'); // or your phone number page route
+                
+              } catch (e) {
+                if (kDebugMode) {
+                  print('❌ Error during logout: $e');
+                }
+                // Still proceed with logout even if deactivation fails
+                final authService = AuthService();
+                await authService.logout();
+                Get.offAllNamed('/login');
+              }
             },
             child: Text(
               "Log out",

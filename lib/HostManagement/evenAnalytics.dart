@@ -8,6 +8,8 @@ class EventAnalyticsScreen {
     required int confirmedGuests,
     required String eventPrice,
     required bool isCheckInActive, // Whether start check-in is active
+    required String eventStatus, // Event status to control bank account button
+    VoidCallback? onRefreshCounts, // Callback to refresh counts in parent
   }) {
     showModalBottomSheet(
       context: context,
@@ -17,6 +19,8 @@ class EventAnalyticsScreen {
         confirmedGuests: confirmedGuests,
         eventPrice: eventPrice,
         isCheckInActive: isCheckInActive,
+        eventStatus: eventStatus,
+        onRefreshCounts: onRefreshCounts,
       ),
     );
   }
@@ -26,11 +30,15 @@ class _EventAnalyticsContent extends StatelessWidget {
   final int confirmedGuests;
   final String eventPrice;
   final bool isCheckInActive;
+  final String eventStatus;
+  final VoidCallback? onRefreshCounts;
 
   const _EventAnalyticsContent({
     required this.confirmedGuests,
     required this.eventPrice,
     required this.isCheckInActive,
+    required this.eventStatus,
+    this.onRefreshCounts,
   });
 
   // Parse price string (e.g., "₹499" -> 499.0)
@@ -134,9 +142,9 @@ class _EventAnalyticsContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 33),
-          // Add bank account button
+          // Add bank account button - show active if completed, locked if not
           GestureDetector(
-            onTap: isCheckInActive
+            onTap: eventStatus.toLowerCase() == 'completed'
                 ? () async {
                     final selectedBank = await Navigator.push(
                       context,
@@ -146,44 +154,42 @@ class _EventAnalyticsContent extends StatelessWidget {
                     );
                     if (selectedBank != null) {
                       // Handle selected bank
-                      // You can add callback or state management here
+                      onRefreshCounts?.call();
                     }
                   }
-                : null,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 57, vertical: 16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(999),
-                color: isCheckInActive
-                    ? const Color(0xFF9355F0) // Active
-                    : const Color(0xFF2F2E2E), // Inactive
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (!isCheckInActive) ...[
-                    Image.asset(
-                      'assets/icons/Lock.png',
-                      width: 20,
-                      height: 20,
-                      color: const Color(0xFF6D6767),
+                : null, // No action if not completed
+            child: eventStatus.toLowerCase() == 'completed'
+                ? Image.asset(
+                    'assets/images/button (3).png', // Active button
+                    height: 52,
+                  )
+                : Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: const Color(0xFF3A3A3A),
                     ),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(
-                    'Add bank account',
-                    style: GoogleFonts.poppins(
-                      color: isCheckInActive
-                          ? Colors.white // White text when active
-                          : const Color(0xFF6D6767), // Gray text when inactive
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.lock,
+                          color: Color(0xFF999999),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Add bank account',
+                          style: GoogleFonts.poppins(
+                            color: const Color(0xFF999999),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
           ),
         ],
       ),

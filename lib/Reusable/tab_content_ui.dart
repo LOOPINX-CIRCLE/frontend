@@ -6,37 +6,34 @@ import 'package:text_code/HostManagement/eventConfirmed.dart';
 import 'package:text_code/HostManagement/eventCheckIn.dart';
 import 'package:text_code/HostManagement/confirmedEmpty.dart';
 import 'package:text_code/HostManagement/sentInvitesScreen.dart';
-
+import 'package:text_code/HostManagement/requestsLoader.dart';
+import 'package:text_code/HostManagement/invitesLoader.dart';
+import 'package:text_code/HostManagement/confirmedLoader.dart';
 class User {
   final String id;
   final String name;
   final String imagePath;
+  final int? requestId; // Add requestId for API calls
+  final String? ticketSecret; // For check-in
   bool isSelected;
   bool isProcessed; // For invited/accepted/checked-in status
+  String? requestStatus; // For request status (pending, accepted, declined)
 
   User({
     required this.id,
     required this.name,
     required this.imagePath,
+    this.requestId,
+    this.ticketSecret,
     this.isSelected = false,
     this.isProcessed = false,
+    this.requestStatus,
   });
 }
 
 class TabContentUI {
-  // Hardcoded user lists for each tab
-  static final List<User> _invitedUsers = [
-    User(id: '1', name: 'Clara', imagePath: 'assets/images/avatar.png'),
-    User(id: '2', name: 'Muskan', imagePath: 'assets/images/avatar.png'),
-    User(id: '3', name: 'Anshi', imagePath: 'assets/images/avatar.png'),
-    User(id: '4', name: 'Sanjana mall', imagePath: 'assets/images/avatar.png'),
-    User(id: '5', name: 'Anushka', imagePath: 'assets/images/avatar.png'),
-    User(id: '6', name: 'Priya', imagePath: 'assets/images/avatar.png'),
-    User(id: '7', name: 'Riya', imagePath: 'assets/images/avatar.png'),
-    User(id: '8', name: 'Sneha', imagePath: 'assets/images/avatar.png'),
-    User(id: '9', name: 'Kavya', imagePath: 'assets/images/avatar.png'),
-    User(id: '10', name: 'Meera', imagePath: 'assets/images/avatar.png'),
-  ];
+  
+  
 
   // Dynamic list to store pending request users
   static final List<User> _requestUsers = [
@@ -190,6 +187,16 @@ class TabContentUI {
     }
   }
 
+  // Method to get the count of checked-in users
+  static int getCheckedInCount() {
+    return _checkedInUserIds.length;
+  }
+
+  // Method to clear all checked-in users (call when switching events)
+  static void clearCheckedInUsers() {
+    _checkedInUserIds.clear();
+  }
+
   static final List<User> _checkInUsers = [
     User(id: '1', name: 'Muskan', imagePath: 'assets/images/avatar.png', isProcessed: true, isSelected: false),
     User(id: '2', name: 'Anshi', imagePath: 'assets/images/avatar.png', isProcessed: false, isSelected: false),
@@ -202,8 +209,20 @@ class TabContentUI {
     String? eventPrice,
     int? confirmedUsers,
     VoidCallback? onUsersInvited,
+    int? eventId,
   }) {
-    // Use dynamic count from stored invited users
+    // If eventId is provided, load real invites from API
+    if (eventId != null) {
+      return InvitesLoader(
+        eventId: eventId,
+        eventName: eventName,
+        eventPrice: eventPrice,
+        confirmedUsers: confirmedUsers,
+        onUsersInvited: onUsersInvited,
+      );
+    }
+    
+    // Otherwise use hardcoded invites (fallback for compatibility)
     final dynamicCount = getInvitedUsersCount();
     
     // If dynamic count is 0, always show empty state (no users invited yet)
@@ -215,28 +234,11 @@ class TabContentUI {
         mainText: 'Start building your guest list',
         subText: 'Use Send invites to handpick your crew.',
         buttonText: 'Sent Invites',
-        onButtonTap: () {
-          // Get root navigator context before closing
-          final rootContext = Navigator.of(context, rootNavigator: true).context;
-          // Close current modal
-          Navigator.pop(context);
-          // Open SentInvitesScreen
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (rootContext.mounted) {
-              showModalBottomSheet(
-                context: rootContext,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => SentInvitesScreen(
-                  eventName: eventName ?? 'Event',
-                  eventPrice: eventPrice ?? '₹0',
-                  confirmedUsers: confirmedUsers ?? 0,
-                  onUsersInvited: onUsersInvited,
-                ),
-              );
-            }
-          });
-        },
+        onButtonTap: null, // Will use default navigation to SentInvitesScreen
+        eventId: eventId,
+        eventName: eventName,
+        eventPrice: eventPrice,
+        confirmedUsers: confirmedUsers,
       );
      } 
     else {
@@ -251,8 +253,19 @@ class TabContentUI {
     String? eventName,
     String? eventPrice,
     int? confirmedUsers,
+    int? eventId,
   }) {
-    // Use dynamic count from pending request users
+    // If eventId is provided, load real requests from API
+    if (eventId != null) {
+      return RequestsLoader(
+        eventId: eventId,
+        eventName: eventName,
+        eventPrice: eventPrice,
+        confirmedUsers: confirmedUsers,
+      );
+    }
+    
+    // Otherwise use hardcoded requests (fallback for compatibility)
     final dynamicCount = getRequestUsersCount();
     
     // If dynamic count is 0, always show empty state (no pending requests)
@@ -264,12 +277,17 @@ class TabContentUI {
         mainText: 'No requests yet',
         subText: 'Requests from guests will appear here once they start requesting to join your event.',
         buttonText: 'Send Invites',
+        eventId: eventId,
+        eventName: eventName,
+        eventPrice: eventPrice,
+        confirmedUsers: confirmedUsers,
       );
     } else {
       // If dynamic count > 0, show the pending request users
       final requestUsersList = getRequestUsers();
       return EventRequests(
         users: requestUsersList,
+        eventId: eventId,
         onUsersAccepted: () {
           // This callback can be used to refresh the UI if needed
         },
@@ -282,9 +300,11 @@ class TabContentUI {
     String? eventName,
     String? eventPrice,
     int? confirmedUsers,
+    int? eventId,
+    String? defaultRsvpOption,
   }) {
-    // Use dynamic count from stored confirmed users
-    final dynamicCount = getConfirmedUsersCount();
+    // Use confirmed count from parameter (from API event.goingCount)
+    final dynamicCount = confirmedUsers ?? 0;
     
     // If dynamic count is 0, always show empty state (no users confirmed yet)
     if (dynamicCount == 0) {
@@ -295,11 +315,25 @@ class TabContentUI {
         mainText: 'No confirmed guests yet',
         subText: 'Guests who accept your invitation will appear here.',
         buttonText: 'Send Invites',
+        eventId: eventId,
+        eventName: eventName,
+        eventPrice: eventPrice,
+        confirmedUsers: confirmedUsers,
       );
     } else {
-      // If dynamic count > 0, show the confirmed users
-      final confirmedUsersList = getConfirmedUsers();
-      return EventConfirmed(users: confirmedUsersList);
+      // If dynamic count > 0 and eventId is available, use API loader
+      if (eventId != null && eventId > 0) {
+        return ConfirmedLoader(
+          eventId: eventId,
+          eventName: eventName,
+          eventPrice: eventPrice,
+          isCheckInMode: false,
+        );
+      } else {
+        // Fallback to hardcoded data if no eventId
+        final confirmedUsersList = getConfirmedUsers();
+        return EventConfirmed(users: confirmedUsersList);
+      }
     }
   }
 
@@ -308,6 +342,7 @@ class TabContentUI {
     String? eventName,
     String? eventPrice,
     int? confirmedUsers,
+    int? eventId,
   }) {
     if (count == 0) {
       return _buildEmptyState(
@@ -320,29 +355,82 @@ class TabContentUI {
         onButtonTap: () {
           // Check confirmed users count
           final confirmedCount = getConfirmedUsersCount();
+          
+          // Get root navigator context before closing
+          final rootContext = Navigator.of(context, rootNavigator: true).context;
+          
+          // Close check-in empty state modal
           Navigator.pop(context);
           
-          if (confirmedCount == 0) {
-            // Show confirmed empty state
-            ConfirmedEmpty.show(context, confirmedCount: confirmedCount);
-          } else {
-            // Show event confirmed in normal mode (not check-in mode)
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) => EventConfirmed(
-                users: getConfirmedUsers(),
-                isCheckInMode: false, // Normal mode, not check-in mode
-              ),
-            );
-          }
+          // After a small delay, show confirmed guests
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (rootContext.mounted) {
+              if (confirmedCount == 0) {
+                // Show confirmed empty state
+                ConfirmedEmpty.show(rootContext, confirmedCount: confirmedCount, eventId: eventId);
+              } else {
+                // Show confirmed guests in normal mode
+                if (eventId != null && eventId > 0) {
+                  showModalBottomSheet(
+                    context: rootContext,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => ConfirmedLoader(
+                      eventId: eventId,
+                      eventName: eventName,
+                      eventPrice: eventPrice,
+                      isCheckInMode: false, // Normal mode, not check-in mode
+                    ),
+                  );
+                } else {
+                  showModalBottomSheet(
+                    context: rootContext,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => EventConfirmed(
+                      users: getConfirmedUsers(),
+                      isCheckInMode: false, // Normal mode, not check-in mode
+                    ),
+                  );
+                }
+              }
+            }
+          });
         },
       );
     } else {
       // Use confirmed users for check-in, not the separate _checkInUsers list
       return EventCheckIn(users: getConfirmedUsers());
     }
+  }
+
+  /// Public method to build empty state UI (used by loaders)
+  static Widget buildEmptyState(
+    BuildContext context, {
+    required String title,
+    required String iconPath,
+    required String mainText,
+    required String subText,
+    required String buttonText,
+    VoidCallback? onButtonTap,
+    int? eventId,
+    String? eventName,
+    String? eventPrice,
+    int? confirmedUsers,
+  }) {
+    return _buildEmptyState(
+      context,
+      title: title,
+      iconPath: iconPath,
+      mainText: mainText,
+      subText: subText,
+      buttonText: buttonText,
+      onButtonTap: onButtonTap,
+      eventId: eventId,
+      eventName: eventName,
+      eventPrice: eventPrice,
+      confirmedUsers: confirmedUsers,
+    );
   }
 
   /// Builds empty state UI
@@ -354,6 +442,10 @@ class TabContentUI {
     required String subText,
     required String buttonText,
     VoidCallback? onButtonTap,
+    int? eventId,
+    String? eventName,
+    String? eventPrice,
+    int? confirmedUsers,
   }) {
     return Container(
       width: 391,
@@ -471,7 +563,25 @@ class TabContentUI {
           // Button
           Center(
             child: GestureDetector(
-              onTap: onButtonTap ?? () => Navigator.pop(context),
+              onTap: onButtonTap ?? () {
+                // Default behavior: show SentInvitesScreen modal (same as mainScreen)
+                if (eventId != null && eventId > 0) {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (context) => SentInvitesScreen(
+                      eventId: eventId,
+                      eventName: eventName ?? 'Event',
+                      eventPrice: eventPrice ?? '₹0',
+                      confirmedUsers: confirmedUsers ?? 0,
+                    ),
+                  );
+                } else {
+                  // Fallback: just pop if no eventId
+                  Navigator.pop(context);
+                }
+              },
               child: Container(
                 width: buttonText.toLowerCase().trim() == 'view guest list' ? 236 : null,
                 padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 16),

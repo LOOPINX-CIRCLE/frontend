@@ -1,22 +1,63 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:text_code/core/services/event_request_service.dart';
 
-class ShareScreen extends StatelessWidget {
+class ShareScreen extends StatefulWidget {
   final Widget imageWidget;
+  final int eventId;
 
-  const ShareScreen({super.key, required this.imageWidget});
-  Future<void> _shareOnWhatsApp(String message) async {
-    final url = "whatsapp://send?text=${Uri.encodeComponent(message)}";
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      // Agar WhatsApp install nahi hai to normal share khol do
-      await Share.share(message, subject: "Event Invitation");
+  const ShareScreen({super.key, required this.imageWidget, this.eventId = 0});
+
+  @override
+  State<ShareScreen> createState() => _ShareScreenState();
+}
+
+class _ShareScreenState extends State<ShareScreen> {
+  late EventRequestService _eventRequestService;
+  String _shareUrl = ""; // Will be fetched from backend
+
+  @override
+  void initState() {
+    super.initState();
+    _eventRequestService = EventRequestService();
+    
+    // Fetch the share URL if eventId is provided
+    if (widget.eventId > 0) {
+      _fetchShareUrl();
+    }
+  }
+
+  Future<void> _fetchShareUrl() async {
+    try {
+      final url = await _eventRequestService.getEventShareUrl(widget.eventId);
+      
+      if (mounted) {
+        setState(() {
+          _shareUrl = url;
+        });
+      }
+      
+      if (kDebugMode) {
+        print('✅ Share URL loaded: $_shareUrl');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching share URL: $e');
+      }
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to load share URL. Please try again.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -59,12 +100,12 @@ class ShareScreen extends StatelessWidget {
                       child: FittedBox(
                         fit: BoxFit
                             .cover, // ✅ fill container, maintaining aspect ratio
-                        child: imageWidget,
+                        child: widget.imageWidget,
                       ),
                     ),
                   ),
 
-                  // ✅ Share button positioned on top
+                  // ✅ Share button positioned on bottom
                   Positioned(
                     bottom: 10,
                     child: ClipRRect(
@@ -101,17 +142,30 @@ class ShareScreen extends StatelessWidget {
                             ),
                           ),
                           onPressed: () async {
+                            // Check if URL is loaded
+                            if (_shareUrl.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Loading share URL...'),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Use the fetched canonical URL
                             String message =
-                                "🎉 You're invited to this awesome event!\nJoin here 👉 https://youreventlink.com";
+                                "🎉 You're invited to this awesome event!\nJoin here 👉 $_shareUrl";
+
+                            if (kDebugMode) {
+                              print('📤 Sharing with message: $message');
+                            }
 
                             // ✅ General share (all apps)
                             await Share.share(
                               message,
                               subject: "Event Invitation",
                             );
-
-                            // ✅ Agar direct WhatsApp share chahiye to niche function call karo:
-                            // await _shareOnWhatsApp(message);
                           },
                         ),
                       ),
@@ -181,5 +235,11 @@ class ShareScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _eventRequestService.dispose();
+    super.dispose();
   }
 }

@@ -321,6 +321,89 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> put(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) async {
+    try {
+      final uri = _buildUri(endpoint);
+      final requestBody = jsonEncode(body ?? <String, dynamic>{});
+      final requestHeaders = {
+        ..._defaultHeaders(),
+        if (headers != null) ...headers,
+      };
+
+      // Use custom timeout if provided, otherwise use default
+      final requestTimeout = timeout ?? ApiConstants.defaultTimeout;
+
+      // Debug logging
+      if (kDebugMode) {
+        print('API Request: PUT $uri');
+        print('Headers: $requestHeaders');
+        print('Body: $requestBody');
+        print('Timeout: ${requestTimeout.inSeconds} seconds');
+      }
+
+      final response = await _httpClient
+          .put(
+            uri,
+            headers: requestHeaders,
+            body: requestBody,
+          )
+          .timeout(requestTimeout);
+
+      // Debug logging
+      if (kDebugMode) {
+        print('API Response: Status ${response.statusCode}');
+        print('Response Body: ${response.body}');
+      }
+
+      return _parseResponse(response);
+    } on TimeoutException catch (error) {
+      if (kDebugMode) {
+        print('API Timeout Error: $error');
+      }
+      throw ApiException(
+        message: 'The request timed out. Please check your internet connection and try again.',
+        error: error,
+      );
+    } catch (error) {
+      if (kDebugMode) {
+        print('API Error: $error');
+        print('Error Type: ${error.runtimeType}');
+      }
+      
+      // Handle different error types
+      final errorMessage = error.toString().toLowerCase();
+      
+      if (errorMessage.contains('socket') || errorMessage.contains('network') || errorMessage.contains('connection')) {
+        throw ApiException(
+          message: 'Unable to reach the server. Please check your network connection.',
+          error: error,
+        );
+      } else if (errorMessage.contains('timeout') || errorMessage.contains('timed out')) {
+        throw ApiException(
+          message: 'The request timed out. Please check your internet connection and try again.',
+          error: error,
+        );
+      } else if (errorMessage.contains('handshake') || errorMessage.contains('ssl') || errorMessage.contains('tls')) {
+        throw ApiException(
+          message: 'Secure connection failed. Please try again later.',
+          error: error,
+        );
+      } else if (error is http.ClientException) {
+        throw ApiException(message: error.message, error: error);
+      } else {
+        throw ApiException(
+          message: 'An unexpected error occurred: ${error.toString()}',
+          error: error,
+        );
+      }
+    }
+  }
+
   void close() {
     _httpClient.close();
   }
