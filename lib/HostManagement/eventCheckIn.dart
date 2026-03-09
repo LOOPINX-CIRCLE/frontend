@@ -238,6 +238,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
 import 'package:text_code/core/services/invitation_service.dart';
+import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/HostManagement/confirmedLoader.dart';
 import 'package:text_code/core/utils/image_url_helper.dart';
 
@@ -259,6 +260,7 @@ class _EventCheckInState extends State<EventCheckIn> {
   late List<User> confirmedUsers;
   final InvitationService _invitationService = InvitationService();
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -295,11 +297,49 @@ class _EventCheckInState extends State<EventCheckIn> {
           );
         }).toList();
         _isLoading = false;
+        _errorMessage = null;
       });
+    } on ApiException catch (e) {
+      setState(() {
+        _isLoading = false;
+        // Check if it's a 400 error (Event not published)
+        if (e.statusCode == 400) {
+          _errorMessage = 'Event is not published';
+        } else if (e.statusCode == 401) {
+          _errorMessage = 'Authentication failed. Please login again.';
+        } else if (e.statusCode == 403) {
+          _errorMessage = 'You do not have permission to access this event.';
+        } else if (e.statusCode == 404) {
+          _errorMessage = 'Event not found.';
+        } else {
+          _errorMessage = e.message;
+        }
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _errorMessage = 'An unexpected error occurred';
       });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -313,6 +353,62 @@ class _EventCheckInState extends State<EventCheckIn> {
         backgroundColor: const Color(0xFF101010),
         body: const Center(
           child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Show error state if there's an error
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF101010),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      color: Colors.red,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9355F0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Go Back',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -365,11 +461,34 @@ class _EventCheckInState extends State<EventCheckIn> {
                 ),
               );
             }
+          } on ApiException catch (e) {
+            // Show appropriate error message based on status code
+            String errorMessage = 'Check-in failed';
+            if (e.statusCode == 400) {
+              errorMessage = 'Event is not published';
+            } else if (e.statusCode == 401) {
+              errorMessage = 'Authentication failed';
+            } else if (e.statusCode == 403) {
+              errorMessage = 'You do not have permission';
+            } else if (e.statusCode == 404) {
+              errorMessage = 'Event or ticket not found';
+            } else {
+              errorMessage = e.message;
+            }
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
           } catch (e) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Check-in failed: $e'),
                 backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
               ),
             );
           }

@@ -13,6 +13,7 @@ import 'package:text_code/HostManagement/sentInvitesScreen.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
 import 'package:text_code/core/services/event_request_service.dart';
 import 'package:text_code/core/services/invitation_service.dart';
+import 'package:text_code/core/network/api_exception.dart';
 
 class MainScreen extends StatefulWidget {
   final String eventName;
@@ -61,16 +62,12 @@ class _MainScreenState extends State<MainScreen> {
     _actualInvitedCount = widget.invitedCount;
     _actualCheckInCount = widget.confirmedUsers; // ✅ Use API's going_count as the base
     
-    // Fetch real-time counts if event ID is available
-    if (widget.eventId != null) {
-      _fetchActualRequestCount();
-      _fetchActualInvitedCount();
-      // Don't fetch check-in count here - use the API's going_count directly
-    }
+    // DO NOT fetch counts in initState - use widget counts directly
+    // Real-time counts will be fetched only when user interacts with the UI
   }
 
   /// Fetch the actual pending request count from the API
-  Future<void> _fetchActualRequestCount() async {
+  Future<void> _fetchActualRequestCount({bool showError = false}) async {
     try {
       if (widget.eventId == null) return;
       
@@ -78,22 +75,37 @@ class _MainScreenState extends State<MainScreen> {
       final requestIds = await _eventRequestService.getEventPendingRequests(widget.eventId!);
       
       // Update the count to reflect only pending requests
-      setState(() {
-        _actualRequestsCount = requestIds.length;
-      });
+      if (mounted) {
+        setState(() {
+          _actualRequestsCount = requestIds.length;
+        });
+      }
+    } on ApiException catch (e) {
+      if (showError && e.statusCode != 400) {
+        // Only show error if not a "not published" error (400)
+        _showErrorSnackBar(e.message);
+      }
+      // Silently fallback to widget's requestsCount if API fails
+      if (mounted) {
+        setState(() {
+          _actualRequestsCount = widget.requestsCount;
+        });
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error fetching pending request count: $e');
       }
-      // Fallback to widget's requestsCount if API fails
-      setState(() {
-        _actualRequestsCount = widget.requestsCount;
-      });
+      // Silently fallback to widget's requestsCount if API fails
+      if (mounted) {
+        setState(() {
+          _actualRequestsCount = widget.requestsCount;
+        });
+      }
     }
   }
 
   /// Fetch the actual pending invitation count from the API
-  Future<void> _fetchActualInvitedCount() async {
+  Future<void> _fetchActualInvitedCount({bool showError = false}) async {
     try {
       if (widget.eventId == null) return;
       
@@ -104,24 +116,52 @@ class _MainScreenState extends State<MainScreen> {
       );
       
       // Update the count to reflect only pending invitations
-      setState(() {
-        _actualInvitedCount = invitations.length;
-      });
+      if (mounted) {
+        setState(() {
+          _actualInvitedCount = invitations.length;
+        });
+      }
+    } on ApiException catch (e) {
+      if (showError && e.statusCode != 400) {
+        // Only show error if not a "not published" error (400)
+        _showErrorSnackBar(e.message);
+      }
+      // Silently fallback to widget's invitedCount if API fails
+      if (mounted) {
+        setState(() {
+          _actualInvitedCount = widget.invitedCount;
+        });
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error fetching pending invited count: $e');
       }
-      // Fallback to widget's invitedCount if API fails
-      setState(() {
-        _actualInvitedCount = widget.invitedCount;
-      });
+      // Silently fallback to widget's invitedCount if API fails
+      if (mounted) {
+        setState(() {
+          _actualInvitedCount = widget.invitedCount;
+        });
+      }
+    }
+  }
+
+  /// Show error snackbar
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
   void _refreshAllCounts() {
-    // Refresh all counts from API
-    _fetchActualRequestCount();
-    _fetchActualInvitedCount();
+    // Refresh all counts from API with error display
+    _fetchActualRequestCount(showError: true);
+    _fetchActualInvitedCount(showError: true);
     _fetchActualCheckInCount();
   }
 
@@ -165,6 +205,7 @@ class _MainScreenState extends State<MainScreen> {
         child: MainScreenContent(
           eventName: widget.eventName,
           eventPrice: widget.eventPrice,
+          eventDateTime: widget.eventDateTime, // Pass event date/time for check-in validation
           confirmedUsers: dynamicConfirmedCount, // Always use dynamic count
           invitedCount: dynamicInvitedCount, // Always use dynamic count
           requestsCount: dynamicRequestsCount, // Use actual request count

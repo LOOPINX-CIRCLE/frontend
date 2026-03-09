@@ -4,6 +4,7 @@ import 'package:text_code/Reusable/tab_content_ui.dart';
 import 'package:text_code/HostManagement/eventInvited.dart';
 import 'package:text_code/HostManagement/sentInvitesScreen.dart';
 import 'package:text_code/core/services/invitation_service.dart';
+import 'package:text_code/core/network/api_exception.dart';
 
 class InvitesLoader extends StatefulWidget {
   final int eventId;
@@ -81,6 +82,24 @@ class _InvitesLoaderState extends State<InvitesLoader> {
       }
       
       return users;
+    } on ApiException catch (e) {
+      if (kDebugMode) {
+        print('ApiException loading invites: $e');
+      }
+      // Provide meaningful error message
+      String errorMessage = 'Failed to load invitations';
+      if (e.statusCode == 400) {
+        errorMessage = 'Event is not published';
+      } else if (e.statusCode == 401) {
+        errorMessage = 'Authentication failed';
+      } else if (e.statusCode == 403) {
+        errorMessage = 'You do not have permission';
+      } else if (e.statusCode == 404) {
+        errorMessage = 'Event not found';
+      } else {
+        errorMessage = e.message;
+      }
+      throw Exception(errorMessage);
     } catch (e) {
       if (kDebugMode) {
         print('Error loading invites: $e');
@@ -135,8 +154,54 @@ class _InvitesLoaderState extends State<InvitesLoader> {
         }
 
         if (snapshot.hasError) {
+          final errorMessage = snapshot.error.toString();
+          
           return Center(
-            child: Text('Error: ${snapshot.error}'),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    errorMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9355F0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Go Back',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           );
         }
 
