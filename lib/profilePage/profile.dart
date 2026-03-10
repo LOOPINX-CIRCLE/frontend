@@ -7,9 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'profile_controller.dart';
-import 'termsCondition.dart';
-import 'PrivacyPolicy.dart';
 import 'package:text_code/core/services/notification_service.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -697,23 +696,27 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildMenuItem(_MenuItem item, bool isLast) {
     return InkWell(
-      onTap: () {
+      onTap: () async {
         // Handle menu item tap
         if (item.title == "Log out") {
           // Show logout confirmation
           _showLogoutDialog();
         } else if (item.title == "Terms of Use") {
-          // Navigate to Terms and Conditions
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const TermsAndConditions()),
-          );
+          try {
+            await launchUrl(Uri.parse('https://loopinsocial.in/terms-and-conditions'));
+          } catch (e) {
+            if (kDebugMode) {
+              print('Could not launch Terms URL: $e');
+            }
+          }
         } else if (item.title == "Privacy Policy") {
-          // Navigate to Privacy Policy
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const PrivacyPolicy()),
-          );
+          try {
+            await launchUrl(Uri.parse('https://loopinsocial.in/privacy-policy'));
+          } catch (e) {
+            if (kDebugMode) {
+              print('Could not launch Privacy Policy URL: $e');
+            }
+          }
         }
       },
       child: Column(

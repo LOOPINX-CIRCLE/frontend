@@ -35,6 +35,7 @@ class SearchUser {
   final String fullName;
   final String username;
   final String? profilePictureUrl;
+  final bool alreadyInvited;
   bool isSelected;
 
   SearchUser({
@@ -42,6 +43,7 @@ class SearchUser {
     required this.fullName,
     required this.username,
     this.profilePictureUrl,
+    this.alreadyInvited = false,
     this.isSelected = false,
   });
 
@@ -51,6 +53,7 @@ class SearchUser {
       fullName: json['full_name'] as String? ?? '',
       username: json['username'] as String? ?? '',
       profilePictureUrl: json['profile_picture_url'] as String?,
+      alreadyInvited: json['already_invited'] as bool? ?? false,
     );
   }
 }
@@ -125,6 +128,7 @@ class InvitationService {
   /// Search for users to invite
   /// Returns a list of users matching the search query
   Future<SearchUserResponse> searchUsers({
+    required int eventId,
     String? search,
     int offset = 0,
     int limit = 50,
@@ -140,29 +144,34 @@ class InvitationService {
         );
       }
 
-      // Build query parameters
-      Map<String, String> queryParams = {
-        'offset': offset.toString(),
-        'limit': limit.toString(),
-      };
+      // Build query parameters as URI query string
+      final queryBuffer = StringBuffer('/events/users/search?');
+      queryBuffer.write('event_id=$eventId&offset=$offset&limit=$limit');
       
       if (search != null && search.isNotEmpty) {
-        queryParams['search'] = search;
+        queryBuffer.write('&search=${Uri.encodeComponent(search)}');
       }
 
-      if (kDebugMode) {
-        print('🔍 Searching users with offset=$offset, limit=$limit, search=$search');
-      }
+      final endpoint = queryBuffer.toString();
+
+
 
       final response = await _apiClient.get(
-        '/events/users/search',
+        endpoint,
         headers: {
           'Authorization': 'Bearer $token',
         },
       );
 
       if (kDebugMode) {
-        print('✅ Search response received');
+        print('✅ [InvitationService.searchUsers] Got API response');
+        print('   Response keys: ${response.keys.toList()}');
+        if (response.containsKey('total')) {
+          print('   total: ${response['total']}');
+          print('   offset: ${response['offset']}');
+          print('   limit: ${response['limit']}');
+          print('   data length: ${(response['data'] as List?)?.length ?? 0}');
+        }
       }
 
       return SearchUserResponse.fromJson(response);

@@ -60,7 +60,10 @@ class _MainScreenState extends State<MainScreen> {
     selectedRsvpOption = null; // Initially no RSVP selected
     _actualRequestsCount = widget.requestsCount;
     _actualInvitedCount = widget.invitedCount;
-    _actualCheckInCount = widget.confirmedUsers; // ✅ Use API's going_count as the base
+    _actualCheckInCount = 0; // Start with 0, will be populated from actual check-ins
+    
+    // Fetch actual check-in count from API
+    _fetchActualCheckInCount();
     
     // DO NOT fetch counts in initState - use widget counts directly
     // Real-time counts will be fetched only when user interacts with the UI
@@ -168,18 +171,28 @@ class _MainScreenState extends State<MainScreen> {
   /// Refresh the actual check-in count when returning from EventCheckIn
   Future<void> _fetchActualCheckInCount() async {
     try {
-      setState(() {
-        // Use the API's confirmed count (going_count) as the source of truth
-        // The local check-ins are just for UI state during the EventCheckIn session
-        _actualCheckInCount = widget.confirmedUsers;
-      });
+      // Fetch attendees and count how many have actually checked in
+      final attendees = await _invitationService.getEventAttendees(widget.eventId!);
+      
+      // Count only attendees who have isCheckedIn: true
+      final checkedInCount = attendees.where((attendee) => attendee.isCheckedIn).length;
+      
+      if (mounted) {
+        setState(() {
+          _actualCheckInCount = checkedInCount;
+        });
+      }
+      
+      if (kDebugMode) {
+        print('✅ Check-in count updated: $checkedInCount out of ${attendees.length} attendees checked in');
+      }
     } catch (e) {
       if (kDebugMode) {
-        print('Error refreshing check-in count: $e');
+        print('Error fetching check-in count: $e');
       }
-      // Fallback to widget's confirmedUsers (API's going_count)
+      // Fallback to 0 if error
       setState(() {
-        _actualCheckInCount = widget.confirmedUsers;
+        _actualCheckInCount = 0;
       });
     }
   }

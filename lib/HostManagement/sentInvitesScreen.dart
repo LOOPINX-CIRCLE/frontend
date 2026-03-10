@@ -549,6 +549,10 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
   }
 
   Future<void> _loadInitialUsers() async {
+    if (kDebugMode) {
+      print('📍 [SentInvitesScreen] Loading initial users');
+      print('   eventId: ${widget.eventId}');
+    }
     await _searchUsers('');
   }
 
@@ -563,17 +567,30 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
     try {
       setState(() => _isLoading = true);
       
+      if (kDebugMode) {
+        print('🔍 [SentInvitesScreen._searchUsers] Starting search');
+        print('   eventId: ${widget.eventId}');
+        print('   query: "$query"');
+      }
+      
       final response = await _invitationService.searchUsers(
+        eventId: widget.eventId ?? 0,
         search: query.isEmpty ? null : query,
         offset: 0,
         limit: 100,
       );
 
+      if (kDebugMode) {
+        print('✅ [SentInvitesScreen._searchUsers] Got response');
+        print('   Total users: ${response.total}');
+        print('   Data count: ${response.data.length}');
+      }
+
       if (mounted) {
         setState(() {
           _users = response.data.map((user) {
             if (kDebugMode) {
-              print('[SentInvitesScreen] User: ${user.fullName}');
+              print('[SentInvitesScreen] User: ${user.fullName} (id: ${user.id}, already_invited: ${user.alreadyInvited})');
               print('  Raw profilePictureUrl: ${user.profilePictureUrl}');
               print('  Resolved imageUrl: ${imageUrl(user.profilePictureUrl ?? '')}');
             }
@@ -585,11 +602,15 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
           }).toList();
           _filteredUsers = List.from(_users);
           _isLoading = false;
+          if (kDebugMode) {
+            print('✅ [SentInvitesScreen._searchUsers] Updated state with ${_users.length} users');
+          }
         });
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error searching users: $e');
+        print('❌ [SentInvitesScreen._searchUsers] Error: $e');
+        print('   Error Type: ${e.runtimeType}');
       }
       if (mounted) {
         setState(() => _isLoading = false);
