@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/utils/image_url_helper.dart';
 
 class EventRequests extends StatelessWidget {

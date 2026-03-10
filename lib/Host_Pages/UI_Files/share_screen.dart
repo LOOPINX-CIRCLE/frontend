@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 
 class ShareScreen extends StatefulWidget {
   final Widget imageWidget;
