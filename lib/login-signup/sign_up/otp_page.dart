@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
+import 'package:text_code/waitHomePage/waitHome.dart';
 
 class OTPPage extends StatefulWidget {
   final String phoneNumber;
@@ -100,23 +101,50 @@ class _OTPPageState extends State<OTPPage> {
         // If profile is complete (needs_profile_completion = false) AND user is verified
         if (needsProfileCompletion == false && isVerified == true) {
           if (kDebugMode) {
-            print('Navigating to home page - user is verified and profile complete');
+            print('Fetching profile after OTP to check is_active status...');
           }
-          // User has completed profile and is verified - navigate to home page
+
+          bool isActive = false;
+          try {
+            final profile = await _authService.fetchProfile();
+            isActive = profile.isActive;
+            if (kDebugMode) {
+              print('Profile fetched after OTP. is_active: $isActive');
+          }
+          } catch (e) {
+            if (kDebugMode) {
+              print('Error fetching profile after OTP: $e');
+            }
+          }
+
+          if (isActive) {
+            if (kDebugMode) {
+              print('User is active. Navigating to home page (BottomBar).');
+            }
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
             (route) => false, // Remove all previous routes
           );
+          } else {
+            if (kDebugMode) {
+              print('User is NOT active (in vetting queue). Navigating to WaitHome.');
+            }
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const WaitHome()),
+              (route) => false,
+            );
+          }
         } else {
           if (kDebugMode) {
             print('Navigating to name page - user needs to complete profile');
           }
           // User needs to complete profile - navigate to name page
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => NameInputScreen()),
-          );
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => NameInputScreen()),
+        );
         }
       } else {
         // Handle failure case

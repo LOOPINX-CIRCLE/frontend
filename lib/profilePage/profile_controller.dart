@@ -146,6 +146,9 @@ class ProfileController extends GetxController {
   
   // Check if user is verified
   bool get isVerified => userProfile.value?.isVerified ?? false;
+
+  // Check if user is active (approved) in the Circle
+  bool get isActive => userProfile.value?.isActive ?? false;
 }
 
 

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
+import 'package:text_code/core/utils/image_utils.dart';
 import 'profile_controller.dart';
 import 'termsCondition.dart';
 import 'PrivacyPolicy.dart';
@@ -125,7 +126,7 @@ class _ProfilePageState extends State<ProfilePage> {
       return ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: Image.network(
-          serverImages.first, // Use the first server image as profile picture
+          resolveImageUrl(serverImages.first), // Use helper to resolve URL
           width: 116,
           height: 112,
           fit: BoxFit.cover,
@@ -217,7 +218,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (index < serverImages.length) {
       // Show server image
       imageWidget = Image.network(
-        serverImages[index],
+        resolveImageUrl(serverImages[index]),
         width: 200,
         height: 200,
         fit: BoxFit.cover,

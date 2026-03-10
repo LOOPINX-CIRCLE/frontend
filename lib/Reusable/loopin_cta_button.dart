@@ -9,7 +9,7 @@ class LoopinCtaButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.variant = LoopinButtonVariant.primary,
-    this.width = 250,
+    this.width = 250.0,
     this.height = 56,
     this.backgroundColor,
     this.textColor,
@@ -21,7 +21,7 @@ class LoopinCtaButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final LoopinButtonVariant variant;
-  final width;
+  final double width;
   final double height;
   final Color? backgroundColor;
   final Color? textColor;
@@ -63,6 +63,8 @@ class LoopinCtaButton extends StatelessWidget {
                     child: Text(
                       label,
                       textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                       style: TextStyle(
                         fontFamily: 'ClashDisplay',
                         color: textColor ?? Colors.white,

@@ -120,82 +120,163 @@ class _InviteEventCardState extends State<InviteEventCard> {
 
   @override
   Widget build(BuildContext context) {
-    double baseHeight = 448;
-    if (!isVisible) return const SizedBox.shrink(); // <-- hide card
+    if (!isVisible) return const SizedBox.shrink(); // hide card when dismissed
 
-    bool showBanner =
-        widget.status == EventStatus.hostedByCurrentUser ||
-        widget.status == EventStatus.attending;
+    // Whether main CTA buttons are shown at the bottom
+    final bool shouldShowButton = widget.showButton;
 
-    bool shouldShowButton = widget.showButton;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-     child: Container(
-  width: double.infinity,
-  height: 401, // fixed height
-  margin: const EdgeInsets.all(12),
-  decoration: BoxDecoration(
-    borderRadius: BorderRadius.circular(28),
-    color: Colors.white,
-    border: Border.all(
-      color: const Color.fromRGBO(107, 97, 97, 1),
-      width: 2,
-    ),
-  ),
-  child: Stack(
-    children: [
-      // Background image
-      Obx(
-        () => ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: _buildImage(widget.imageUrls[currentImageIndex.value]),
+    // Build the core event card
+    Widget card = Container(
+      width: double.infinity,
+      height: 401, // fixed height
+      // No top margin so the card can overlap the banner cleanly
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        color: Colors.white,
+        border: Border.all(
+          color: const Color.fromRGBO(107, 97, 97, 1),
+          width: 2,
         ),
       ),
-      // Add other overlay widgets here if needed
-            // Banner
-            if (widget.status == EventStatus.hostedByCurrentUser)
-              _buildBanner(
-                colors: [
-                  const Color.fromRGBO(148, 84, 239, 1),
-                  const Color.fromRGBO(85, 15, 186, 1),
-                ],
-                text: "Your Event is Live!",
-                icon: "assets/icons/Rectangle 1.png",
-              )
-            else if (widget.status == EventStatus.attending)
-              _buildBanner(
-                colors: [
-                  const Color.fromRGBO(255, 145, 41, 1),
-                  const Color.fromRGBO(255, 94, 0, 1),
-                ],
-                text: "You're Going!",
-                icon: "assets/icons/Fire.png",
-              ),
+      child: Stack(
+        children: [
+          // Background image
+          Obx(
+            () => ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: _buildImage(widget.imageUrls[currentImageIndex.value]),
+            ),
+          ),
 
-            // Price Tag, Badge, and Upload Icon Row
-            Positioned(
-              top: 15,
-              left: 16,
-              right: 16,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Price Tag (Left Side)
-                  if (!widget.isEnded)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(
-                          sigmaX: 10.0,
-                          sigmaY: 10.0,
+          // Price tag, "You're Going" pill and upload icon row
+          Positioned(
+            top: 15,
+            left: 16,
+            right: 16,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Price Tag (Left Side) - hide for ended and "Deadline Has Passed"
+                if (!widget.isEnded && widget.badgeText != "Deadline Has Passed")
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: 10.0,
+                        sigmaY: 10.0,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
                         ),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(77, 7, 7, 7),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                            width: 1,
                           ),
+                        ),
+                        child: Text(
+                          (widget.isPaid == true && widget.price != null)
+                              ? "₹ ${(double.tryParse(widget.price!) ?? 0).toInt()}"
+                              : "Free",
+                          style: const TextStyle(
+                            fontFamily: 'ClashDisplay',
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            fontStyle: FontStyle.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Badge (center)
+                if (widget.badgeText.isNotEmpty)
+                  Expanded(
+                    child: Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(
+                            sigmaX: 10.0,
+                            sigmaY: 10.0,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: widget.badgeText == "Your Event is Live!"
+                                  ? const Color(0xFF8B5CF6).withOpacity(0.8)
+                                  : const Color.fromARGB(77, 7, 7, 7),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color:
+                                    widget.badgeText == "Your Event is Live!"
+                                        ? const Color(0xFF8B5CF6)
+                                            .withOpacity(0.5)
+                                        : Colors.white.withOpacity(0.1),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (widget.starImagePath != null &&
+                                    widget.badgeText != "Your Event is Live!")
+                                  Image.asset(
+                                    widget.starImagePath!,
+                                    height: 24,
+                                    width: 24,
+                                  ),
+                                if (widget.starImagePath != null &&
+                                    widget.badgeText != "Your Event is Live!")
+                                  const SizedBox(width: 5),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8.0, vertical: 4.0),
+                                  child: Text(
+                                    widget.badgeText,
+                                    style: const TextStyle(
+                                      fontFamily: 'ClashDisplay',
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      fontStyle: FontStyle.normal,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const Spacer(),
+
+                // Upload icon (right) - hide for ended and "Deadline Has Passed"
+                if (!widget.isEnded && widget.badgeText != "Deadline Has Passed")
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(50),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: 10.0,
+                        sigmaY: 10.0,
+                      ),
+                      child: GestureDetector(
+                        onTap: widget.onUploadTap,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: const Color.fromARGB(77, 7, 7, 7),
                             borderRadius: BorderRadius.circular(10),
@@ -204,211 +285,155 @@ class _InviteEventCardState extends State<InviteEventCard> {
                               width: 1,
                             ),
                           ),
-                          child: Text(
-                            (widget.isPaid == true && widget.price != null)
-                                ? "₹ ${(double.tryParse(widget.price!) ?? 0).toInt()}"
-                                : "Free",
-                            style: const TextStyle(
-                              fontFamily: 'ClashDisplay',
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500, // Medium
-                              fontStyle: FontStyle.normal,
-                            ),
+                          child: Image.asset(
+                            "assets/icons/Upload Minimalistic.png",
+                            height: 24,
+                            width: 24,
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ),
-                  
-                  // Badge (Center) - only show if badgeText is not empty
-                  if (widget.badgeText.isNotEmpty)
-                    Expanded(
-                      child: Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(
-                              sigmaX: 10.0,
-                              sigmaY: 10.0,
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                // Purple background for "Your Event is Live!" badge
-                                color: widget.badgeText == "Your Event is Live!"
-                                    ? const Color(0xFF8B5CF6).withOpacity(0.8) // Purple color
-                                    : const Color.fromARGB(77, 7, 7, 7),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: widget.badgeText == "Your Event is Live!"
-                                      ? const Color(0xFF8B5CF6).withOpacity(0.5)
-                                      : Colors.white.withOpacity(0.1),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // Don't show star icon for "Your Event is Live!" badge
-                                  if (widget.starImagePath != null && widget.badgeText != "Your Event is Live!")
-                                    Image.asset(
-                                      widget.starImagePath!,
-                                      height: 24,
-                                      width: 24,
-                                    ),
-                                  if (widget.starImagePath != null && widget.badgeText != "Your Event is Live!")
-                                    const SizedBox(width: 5),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                                    child: Text(
-                                      widget.badgeText,
-                                      style: const TextStyle(
-                                        fontFamily: 'ClashDisplay',
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500, // Medium
-                                        fontStyle: FontStyle.normal,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    const Spacer(), // Add spacer if no badge to balance layout
-                  
-                  // Upload Icon (Right Side)
-                  if (!widget.isEnded)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(50),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(
-                          sigmaX: 10.0,
-                          sigmaY: 10.0,
-                        ),
-                        child: GestureDetector(
-                          onTap: widget.onUploadTap,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color.fromARGB(77, 7, 7, 7),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.1),
-                                width: 1,
-                              ),
-                            ),
-                            child: Image.asset(
-                              "assets/icons/Upload Minimalistic.png",
-                              height: 24,
-                              width: 24,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                  ),
+              ],
             ),
+          ),
 
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
-                  ),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.85),
-                    ],
-                  ),
+          // Bottom gradient, title, details and buttons
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
                 ),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'ClashDisplay',
-                        fontSize: 34,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        fontStyle: FontStyle.normal,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      widget.dateLocation,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'ClashDisplay',
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500, // Medium
-                        fontStyle: FontStyle.normal,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "Hosted by ${widget.hostName}",
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'ClashDisplay',
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500, // Medium
-                        fontStyle: FontStyle.normal,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    shouldShowButton ? _buildActionButtons() : const SizedBox.shrink(),
-                    const SizedBox(height: 6),
-                    Obx(() {
-                      int dotCount = widget.imageUrls.length >= 3
-                          ? widget.imageUrls.length
-                          : 3;
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(dotCount, (index) {
-                          bool isActive =
-                              currentImageIndex.value % dotCount == index;
-                          return Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            height: 6,
-                            width: isActive ? 16 : 10,
-                            decoration: BoxDecoration(
-                              color: isActive ? Colors.white : Colors.grey,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          );
-                        }),
-                      );
-                    }),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.85),
                   ],
                 ),
               ),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'ClashDisplay',
+                      fontSize: 34,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      fontStyle: FontStyle.normal,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.dateLocation,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'ClashDisplay',
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.normal,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    "Hosted by ${widget.hostName}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'ClashDisplay',
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.normal,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  shouldShowButton
+                      ? _buildActionButtons()
+                      : const SizedBox.shrink(),
+                  const SizedBox(height: 6),
+                  Obx(() {
+                    int dotCount =
+                        widget.imageUrls.length >= 3 ? widget.imageUrls.length : 3;
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(dotCount, (index) {
+                        bool isActive =
+                            currentImageIndex.value % dotCount == index;
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: 6,
+                          width: isActive ? 16 : 10,
+                          decoration: BoxDecoration(
+                            color: isActive ? Colors.white : Colors.grey,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        );
+                      }),
+                    );
+                  }),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+
+    // Optional orange banner above the card
+    Widget? banner;
+    if (widget.status == EventStatus.hostedByCurrentUser) {
+      banner = _buildBanner(
+        colors: const [
+          Color.fromRGBO(148, 84, 239, 1),
+          Color.fromRGBO(85, 15, 186, 1),
+        ],
+        text: "Your Event is Live!",
+        icon: "assets/icons/Rectangle 1.png",
+      );
+    } else if (widget.status == EventStatus.attending) {
+      banner = _buildBanner(
+        colors: const [
+          Color.fromRGBO(255, 145, 41, 1),
+          Color.fromRGBO(255, 94, 0, 1),
+        ],
+        text: "You're Going!",
+        icon: "assets/icons/Fire.png",
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (banner != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: banner,
+            ),
+          if (banner != null)
+            Transform.translate(
+              // Pull the card up slightly so it overlaps
+              // the orange banner (no black gap).
+              offset: const Offset(0, -16),
+              child: card,
+            )
+          else
+            card,
+        ],
       ),
     );
   }
@@ -454,27 +479,8 @@ class _InviteEventCardState extends State<InviteEventCard> {
               label: widget.price != null
                   ? "${widget.firstButtonText} ₹ ${widget.price}"
                   : widget.firstButtonText,
-              onPressed: () {
-                Get.to(() => EventDetail(
-                      title: widget.title,
-                      date: DateFormat('EEEE d, MMMM yyyy').format(DateTime.now().subtract(const Duration(hours: 48))),
-                      time: "5:PM",
-                      hostName: widget.hostName,
-                      hostImage: "assets/images/avatar.png",
-                      eventImage: widget.imageUrls.isNotEmpty
-                          ? widget.imageUrls[0]
-                          : "assets/images/placeholder.png",
-                      venue: "Bastian Garden City",
-                      fullAddress: "Bastian Garden City, Dehradun, Uttarakhand",
-                      aboutEvent: "Event details will be shown here",
-                      badgeText: widget.badgeText,
-                      attendeesCount: 24,
-                      attendeeImages: const ["assets/images/avatar.png"],
-                      isGoing: false,
-                      price: widget.price,
-                      starImagePath: widget.starImagePath,
-                    ));
-              },
+              // Let the parent (HomePages) decide what happens on tap.
+              onPressed: widget.onFirstButtonTap,
             ),
           ),
           const SizedBox(width: 12),
@@ -488,6 +494,7 @@ class _InviteEventCardState extends State<InviteEventCard> {
               textColor: Colors.white,
               onPressed: () {
                 _hideCard();
+                // Delegate second-button behavior to parent if provided.
                 widget.onSecondButtonTap?.call();
               },
             ),
@@ -504,33 +511,46 @@ class _InviteEventCardState extends State<InviteEventCard> {
     required String text,
     required String icon,
   }) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(28),
-            topRight: Radius.circular(28),
-          ),
-          gradient: LinearGradient(colors: colors),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(28.361),
+          topRight: Radius.circular(28.361),
+          bottomLeft: Radius.circular(0),
+          bottomRight: Radius.circular(0),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(icon, width: 50, height: 50),
-            const SizedBox(width: 6),
-            Text(
-              text,
-              style: GoogleFonts.bricolageGrotesque(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
+        gradient: RadialGradient(
+          center: const Alignment(0.499, 0),
+          radius: 0.52,
+          colors: const [
+            Color(0xFFFF9028),
+            Color(0xFFFF5E00),
           ],
+          stops: const [0.0, 1.0],
         ),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 2,
+        ),
+      ),
+      // Slightly taller so part of it sits under the card
+      // while still leaving a clear orange strip visible above.
+      height: 58,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(icon, width: 35, height: 35),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              fontFamily: 'ClashDisplay',
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

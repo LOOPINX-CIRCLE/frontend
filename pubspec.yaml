@@ -26,6 +26,7 @@ dependencies:
   video_player: ^2.9.2
   flutter_secure_storage: ^9.2.2
   flutter_dotenv: ^5.0.2
+  webview_flutter: ^4.9.0
 
 dev_dependencies:
   flutter_test:
@@ -40,13 +41,24 @@ flutter:
      - assets/images/button/
      - assets/video/
      - .env
-
-  # fonts:
-  #   - family: Nomixa
-  #     fonts:
-  #        - asset: assets/fonts/Nomixa-Regular.otf
-  #        - asset: assets/fonts/Nomixa-Bold.otf
-  #        - asset: assets/fonts/Nomixa-Medium.otf
-  #        - asset: assets/fonts/Nomixa-SemiBold.otf
+  fonts:
+    - family: ClashDisplay
+      fonts:
+        - asset: assets/fonts/ClashDisplay-Extralight.otf
+          weight: 200
+        - asset: assets/fonts/ClashDisplay-Light.otf
+          weight: 300
+        - asset: assets/fonts/ClashDisplay-Regular.otf
+          weight: 400
+        - asset: assets/fonts/ClashDisplay-Medium.otf
+          weight: 500
+        - asset: assets/fonts/ClashDisplay-Semibold.otf
+          weight: 600
+        - asset: assets/fonts/ClashDisplay-Bold.otf
+          weight: 700
+    - family: Ballet
+      fonts:
+        - asset: assets/fonts/Ballet_24pt-Regular.ttf
+          weight: 400
 
 

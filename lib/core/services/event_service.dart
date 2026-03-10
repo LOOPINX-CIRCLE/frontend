@@ -35,7 +35,7 @@ class EventService {
       }
 
       final response = await _apiClient.get(
-        '/events/$eventId',
+        '/api/events/$eventId',
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -114,9 +114,9 @@ class EventService {
         print('Fetching events list with token...');
       }
 
-      // Try to fetch from /events endpoint (list endpoint)
+      // Try to fetch from /api/events endpoint (list endpoint)
       final response = await _apiClient.get(
-        '/events',
+        '/api/events',
         headers: {
           'Authorization': 'Bearer $token',
         },

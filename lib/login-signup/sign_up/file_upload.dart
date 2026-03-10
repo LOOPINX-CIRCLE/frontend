@@ -13,6 +13,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/login-signup/Controller/user_controller.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
+import 'package:text_code/waitHomePage/waitHome.dart';
 
 class PhotoUploadScreen extends StatefulWidget {
   const PhotoUploadScreen({super.key});
@@ -78,13 +79,13 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
 
   bool get allImagesSelected => _selectedImages.every((file) => file != null);
   int get uploadedImageCount => _selectedImages.where((file) => file != null).length;
-  bool get hasMinImages => uploadedImageCount >= 4;
+  bool get hasMinImages => uploadedImageCount >= 1;
 
   Future<void> _onNext() async {
     if (!hasMinImages) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least 4 photos'),
+          content: Text('Please select at least 1 photo'),
           backgroundColor: Colors.red,
         ),
       );
@@ -226,10 +227,10 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         }
       }
 
-      // Check if we have at least 4 images (API requirement)
-      if (imageData.length < 4) {
+      // Check if we have at least 1 image (API requirement)
+      if (imageData.length < 1) {
         throw ApiException(
-          message: 'Please select at least 4 profile pictures',
+          message: 'Please select at least 1 profile picture',
           statusCode: 400,
         );
       }
@@ -298,11 +299,13 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         }
 
         // Fetch and set the latest profile in ProfileController before navigating
+        bool isActive = false;
         try {
           final profileController = Get.find<ProfileController>();
           await profileController.fetchProfile();
+          isActive = profileController.isActive;
           if (kDebugMode) {
-            print('Fetched latest profile after completion.');
+            print('Fetched latest profile after completion. is_active: $isActive');
           }
         } catch (e) {
           if (kDebugMode) {
@@ -310,11 +313,18 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
           }
         }
 
-        // Navigate to home
+        // Navigate based on is_active status
+        if (isActive) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
         );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WaitHome()),
+          );
+        }
       } else {
         // Handle API validation errors
         final errorMessage = response['message']?.toString() ?? 
@@ -582,7 +592,7 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
                     ),
                   ] else ...[
                     Text(
-                      "Minimum 4 photos are required ",
+                      "Minimum 1 photo is required ",
                       style: TextStyle(
                         color: const Color(0xff868686),
                         fontSize: 14,
