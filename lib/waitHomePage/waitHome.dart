@@ -1,10 +1,8 @@
 // ignore_for_file: library_private_types_in_public_api
 
 import 'package:flutter/material.dart';
-import 'package:text_code/waitVideo.dart';
 import 'package:text_code/Reusable/waitNavigation.dart';
 import 'package:text_code/profilePage/profile.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class WaitHome extends StatefulWidget {
   const WaitHome({super.key});
@@ -16,122 +14,126 @@ class WaitHome extends StatefulWidget {
 class _WaitHomeState extends State<WaitHome> {
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
-        fit: StackFit.expand,
         children: [
-          // Video background - full screen
+          // Background image
           Positioned.fill(
-            child: WaitVideo(
-              videoPath: 'assets/video/WaitlistVideo.mp4',
-              autoPlay: true,
-              looping: true,
-              volume: 1.0,
+            child: Image.asset(
+              'assets/images/waitlist.png',
+              fit: BoxFit.cover,
             ),
           ),
-          
-          // Background container at the bottom with arc shape
-         Positioned(
-  left: 0,
-  right: 0,
-  bottom: 0,
-  child: Container(
-    width: double.infinity,
-    height: 530,
-    decoration: const BoxDecoration(
-      image: DecorationImage(
-        image: AssetImage('assets/images/Ellipse 1.png'),
-        fit: BoxFit.cover, // makes it fill the width fully
-      ),
-    ),
-  ),
-),
-
-          // Featured icon at the top center of the arc
-          Positioned(
-            bottom: 500, // Position slightly below the top edge of the arc container
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Image.asset(
-                'assets/images/Featured icon.png',
-                width: 60,
-                height: 60,
-              ),
-            ),
-          ),
-          
-          // "You're In The Vetting Queue" image below featured icon
-          Positioned(
-  bottom: 420, // Position below the featured icon
-  left: 0,
-  right: 0,
-  child: Center(
-    child: Text(
-      "You're In The Vetting Queue",
-      
-          style: GoogleFonts.bricolageGrotesque(
-        fontSize: 26,
-        fontWeight: FontWeight.w600,
-        color: Colors.white, // or any color you prefer
-      ),
-      textAlign: TextAlign.center,
-    ),
-  ),
-),
-
-          
-          // Text below the image
-          Positioned(
-            bottom: 360, // Position below the "You're In The Vetting Queue" image
-            left: 0,
-            right: 0,
+          // Main waitlist content
+          SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 25),
-              child: Text(
-                "We're ensuring The Circle is the right fit. We'll send a notification the moment your access is approved.",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontStyle: FontStyle.normal,
-                  fontWeight: FontWeight.w300,
-                  height: 1.25, // line-height: 20px / 16px = 1.25
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Headline line 1
+                    const Text(
+                      'Highly Selective',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'ClashDisplay',
+                        fontWeight: FontWeight.w500, // 500
+                        fontSize: 49,
+                        color: Colors.white,
+                        height: 1.1,
+                        letterSpacing: -2.0,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // Headline line 2: "and curated"
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: const TextSpan(
+                        children: [
+                          // "and"
+                          TextSpan(
+                            text: 'and',
+                            style: TextStyle(
+                              fontFamily: 'ClashDisplay',
+                              fontWeight: FontWeight.w500,
+                              fontSize: 49,
+                              color: Colors.white,
+                              height: 1.0,
+                              letterSpacing: -1.0,
+                            ),
+                          ),
+                          // explicit gap of two spaces between "and" and "Curated"
+                          TextSpan(
+                            text: '   ',
+                            style: TextStyle(
+                              fontFamily: 'ClashDisplay',
+                              fontWeight: FontWeight.w500,
+                              fontSize: 49,
+                              color: Colors.white,
+                              height: 1.0,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                          // "Curated" in Ballet
+                          TextSpan(
+                            text: 'Curated',
+                            style: TextStyle(
+                              fontFamily: 'Ballet',
+                              fontWeight: FontWeight.w400,
+                              fontSize: 60,
+                              color: Colors.white,
+                              height: 1.0,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Body copy
+                    const Text(
+                      "Our team is reviewing your\nprofile for exclusive access.\nYou'll be notified shortly.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'ClashDisplay',
+                        fontWeight: FontWeight.w300, // 300
+                        fontSize: 26,
+                        color: Colors.white,
+                        height: 1.2,
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          
-          // Logo and text image just above navigation bar
+
+          // Navigation bar 70px above the bottom
           Positioned(
-            bottom: 80, // Position just above the navigation bar (24 + 65 + some spacing)
             left: 0,
             right: 0,
-            child: Center(
-              child: Image.asset(
-                'assets/images/Logo and text (1).png',
-                fit: BoxFit.contain,
-               
-              ),
-            ),
-          ),
-          
-          // Navigation bar at the bottom
-          WaitNavigationBar(
-            onTap: (index) {
-              // Handle navigation - index 2 is the Profile icon
-              if (index == 2) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfilePage(
-                      hasHomePagesAccess: false, // User is on waitlist, not verified
+            bottom: 70,
+            child: WaitNavigationBar(
+              onTap: (index) {
+                // Handle navigation - index 2 is the Profile icon
+                if (index == 2) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfilePage(
+                        hasHomePagesAccess: false, // User is on waitlist, not verified
+                      ),
                     ),
-                  ),
-                );
-              }
-            },
+                  );
+                }
+              },
+            ),
           ),
         ],
       ),

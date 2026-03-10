@@ -8,6 +8,7 @@ import 'package:text_code/Host_Pages/Map_integration/api_services.dart';
 import 'package:text_code/core/config/web_config.dart';
 import 'package:text_code/core/services/web_places_service.dart';
 import 'package:text_code/core/services/web_location_service.dart';
+import 'package:text_code/core/utils/image_utils.dart';
 
 class MapController extends StatefulWidget {
   const MapController({super.key});
@@ -463,7 +464,7 @@ class MapPreview extends StatelessWidget {
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Image.network(
-            staticMapUrl,
+            resolveImageUrl(staticMapUrl),
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) => Text(
               "⚠️ Map load failed",

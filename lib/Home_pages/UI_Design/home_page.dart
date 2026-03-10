@@ -8,9 +8,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:text_code/Home_pages/Controller/home_page.dart';
 import 'package:text_code/core/models/event.dart';
+import 'package:text_code/core/models/event_invitation.dart';
 import 'package:text_code/Reusable/eventcard.dart';
 import 'package:text_code/Reusable/smart_image.dart';
 import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_screen_zero.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/ticket_price_screen.dart';
 import 'package:text_code/Host_Pages/Controller_files/capicity_cntoller.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
@@ -263,6 +265,24 @@ class _HomePagesState extends State<HomePages> {
     );
   }
 
+  /// Check if event is free based on ticket price
+  /// Returns true if ticket_price is null, empty, "0", "0.00", "00.00", etc.
+  bool _isEventFree(String? ticketPrice) {
+    if (ticketPrice == null || ticketPrice.isEmpty) {
+      return true;
+    }
+    
+    // Try to parse as double and check if it's zero
+    final price = double.tryParse(ticketPrice.trim());
+    if (price == null) {
+      // If can't parse, check if it's a zero string
+      final trimmed = ticketPrice.trim().toLowerCase();
+      return trimmed == '0' || trimmed == '0.00' || trimmed == '00.00' || trimmed == '0.0';
+    }
+    
+    return price == 0.0;
+  }
+
   /// Format date location string from event
   /// Format: "7 Jun 25, Bastian garden city"
   String _formatDateLocation(String startTime, String locationName) {
@@ -420,7 +440,11 @@ class _HomePagesState extends State<HomePages> {
                   );
                 }
 
+                // Create a key based on events to force FutureBuilder to rebuild when events change
+                final eventsKey = homePageController.events.map((e) => e.id).join(',');
+                
                 return FutureBuilder<Map<String, dynamic>>(
+                  key: ValueKey('user_data_$eventsKey'), // Force rebuild when events change
                   future: Future.wait([
                     _getCurrentUserId(),
                     _getCurrentUserPhoneNumber(),
@@ -468,8 +492,90 @@ class _HomePagesState extends State<HomePages> {
                       return b.id.compareTo(a.id); // Latest event ID first
                     });
                     
-                    return Column(
-                      children: sortedEvents.map((event) {
+                    if (kDebugMode) {
+                      print('Events sorted. Total events: ${sortedEvents.length}');
+                      print('Event IDs: ${sortedEvents.map((e) => e.id).join(', ')}');
+                    }
+                    
+                    // Fetch all user requests from /api/events/my-requests
+                    // This endpoint returns all requests with event_id, status, can_confirm, etc.
+                    return FutureBuilder<Map<int, Map<String, dynamic>?>>(
+                      key: ValueKey('request_status_$eventsKey'), // Force rebuild when events change
+                      future: _eventRequestService.getAllUserRequests().then((allRequests) {
+                        // Create a map of event_id -> request data
+                        final Map<int, Map<String, dynamic>?> requestMap = {};
+                        
+                        for (final request in allRequests) {
+                          final eventId = request['event_id'];
+                          if (eventId != null) {
+                            final eventIdInt = eventId is int ? eventId : int.tryParse(eventId.toString());
+                            if (eventIdInt != null) {
+                              requestMap[eventIdInt] = request;
+                            }
+                          }
+                        }
+                        
+                        if (kDebugMode) {
+                          print('Request status map created with ${requestMap.length} entries from /api/events/my-requests');
+                          requestMap.forEach((key, value) {
+                            print('  Event $key: status=${value?['status']}, can_confirm=${value?['can_confirm']}');
+                          });
+                        }
+                        
+                        return requestMap;
+                      }),
+                      builder: (context, requestStatusSnapshot) {
+                        // Show loading while fetching request statuses
+                        if (requestStatusSnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: Colors.white),
+                          );
+                        }
+                        
+                        final requestStatusMap = requestStatusSnapshot.data ?? {};
+                        
+                        if (kDebugMode) {
+                          print('=== Request Status Map in builder ===');
+                          print('Number of events: ${sortedEvents.length}');
+                          print('Number of statuses: ${requestStatusMap.length}');
+                          print('Request Status Map keys: ${requestStatusMap.keys}');
+                          print('Request Status Map: $requestStatusMap');
+                          sortedEvents.forEach((event) {
+                            final status = requestStatusMap[event.id];
+                            print('  Event ${event.id} (${event.title}): ${status?['status'] ?? 'null (404)'}');
+                            print('    Event ID type: ${event.id.runtimeType}');
+                            print('    Map key types: ${requestStatusMap.keys.map((k) => k.runtimeType).toList()}');
+                            print('    Direct lookup result: $status');
+                            if (status != null) {
+                              print('    Status object: $status');
+                              print('    Status type: ${status.runtimeType}');
+                            }
+                          });
+                        }
+                        
+                        return Column(
+                          children: sortedEvents.map((event) {
+                        // Find matching invitation for this event, if any
+                        EventInvitation? invitation;
+                        for (final inv in homePageController.invitations) {
+                          if (inv.eventId == event.id) {
+                            invitation = inv;
+                            break;
+                          }
+                        }
+
+                        final bool hasInvitation = invitation != null;
+                        final String invitationStatus =
+                            (invitation?.status ?? '').toLowerCase();
+                        final bool isInvitationPending =
+                            invitationStatus == 'pending';
+                        final bool isInvitationAccepted =
+                            invitationStatus == 'accepted';
+                        final bool isInvitationDeclined =
+                            invitationStatus == 'declined';
+                        final bool isInvitationExpired =
+                            invitationStatus == 'expired';
+
                         // Check if current user is hosting this event (using both ID and phone number)
                         final bool isUserHost = _isUserHostingEvent(event, currentUserId, currentUserPhoneNumber);
                         
@@ -481,30 +587,139 @@ class _HomePagesState extends State<HomePages> {
                           print('  Is User Host: $isUserHost');
                         }
                         
-                        // Determine badge text based on event status
+                        // Get request status from API response
+                        // API endpoint: GET /api/events/{event_id}/my-request
+                        // Returns: Map with 'status' field if request exists, null if 404 (no request)
+                        // Match the exact logic from eventdetail.dart
+                        final requestStatus = requestStatusMap[event.id];
+                        
+                        // Extract status string from API response - match eventdetail.dart logic exactly
+                        // Status values: "pending", "accepted", or null (404 - no request)
+                        String requestStatusString = '';
+                        if (requestStatus != null) {
+                          final statusValue = requestStatus?['status'];
+                          if (statusValue != null) {
+                            requestStatusString = statusValue.toString().trim().toLowerCase();
+                          }
+                        }
+                        
+                        // Determine badge text based on event status (declare early for use in button logic)
                         final bool hasEnded = event.hasEnded;
-                        String badgeText = isUserHost && !hasEnded 
-                            ? "Your Event is Live!" 
-                            : hasEnded 
-                                ? "Event Has Ended" 
-                                : "New Event";
                         final bool isEnded = hasEnded;
+                        
+                        // Determine request status flags based on API response
+                        // Button logic is purely based on API status, not widget title
+                        final isRequestPending = requestStatusString == 'pending';
+                        final isRequestAccepted = requestStatusString == 'accepted';
+                        final isRequestGoing = requestStatusString == 'going'; // Status after confirming attendance
+                        
+                        // Check can_confirm field from API response
+                        final canConfirm = requestStatus?['can_confirm'] as bool? ?? true;
+                        
+                        // Show "View Ticket" button when: status == "accepted" AND can_confirm == false
+                        final shouldShowViewTicket = isRequestAccepted && !canConfirm && !isUserHost && !isEnded && !isInvitationAccepted;
+                        
+                        if (kDebugMode) {
+                          print('=== Home Page Button Status ===');
+                          print('  Event ID: ${event.id}');
+                          print('  Event Title: ${event.title}');
+                          print('  requestStatus object: $requestStatus');
+                          print('  requestStatusString: "$requestStatusString"');
+                          print('  isRequestPending: $isRequestPending');
+                          print('  isRequestAccepted: $isRequestAccepted');
+                          print('  requestStatusMap contains event: ${requestStatusMap.containsKey(event.id)}');
+                          print('  requestStatusMap[event.id] direct: ${requestStatusMap[event.id]}');
+                          if (requestStatus != null) {
+                            print('  requestStatus type: ${requestStatus.runtimeType}');
+                            if (requestStatus is Map) {
+                              print('  requestStatus keys: ${requestStatus.keys}');
+                              print('  requestStatus[\'status\']: ${requestStatus['status']}');
+                              print('  requestStatus full: $requestStatus');
+                            } else {
+                              print('  WARNING: requestStatus is not a Map!');
+                            }
+                          } else {
+                            print('  requestStatus is null (404 - no request for this event)');
+                          }
+                        }
+                        String badgeText;
+                        if (isUserHost && !hasEnded) {
+                          badgeText = "Your Event is Live!";
+                        } else if (hasEnded) {
+                          badgeText = "Event Has Ended";
+                        } else if (!isUserHost && hasInvitation) {
+                          if (isInvitationExpired) {
+                            badgeText = "Deadline Has Passed";
+                          } else if (isInvitationPending) {
+                            badgeText = "New Invite";
+                          } else if (isInvitationAccepted) {
+                            badgeText = "Ticket generated";
+                          } else if (isInvitationDeclined) {
+                            badgeText = "Invite declined";
+                          } else {
+                            badgeText = "New Event";
+                          }
+                        } else if (shouldShowViewTicket) {
+                          // For events with a generated ticket, show "You're Going" badge
+                          badgeText = "You're Going!";
+                        } else {
+                          badgeText = "New Event";
+                        }
+
+                        // Decide badge icon based on badge text
+                        String? badgeIconPath;
+                        if (badgeText == "You're Going!") {
+                          badgeIconPath = "assets/icons/Group 1 (5).png";
+                        } else if (badgeText == "New Invite") {
+                          badgeIconPath = "assets/icons/Group 1 (6).png";
+                        } else if (badgeText == "Event Has Ended") {
+                          badgeIconPath = "assets/icons/Group 1 (3).png";
+                        } else if (badgeText == "Deadline Has Passed") {
+                          badgeIconPath = "assets/icons/Group 1 (4).png";
+                        } else {
+                          badgeIconPath = "assets/icons/Group 1 (2).png";
+                        }
+                        
+                        // Debug logging for request status - extensive logging
+                        if (kDebugMode) {
+                          print('=== Event: ${event.title} (ID: ${event.id}) ===');
+                          print('  Request Status Object: $requestStatus');
+                          print('  Status Value from object: ${requestStatus?['status']}');
+                          print('  Status String: "$requestStatusString" (empty: ${requestStatusString.isEmpty}, length: ${requestStatusString.length})');
+                          print('  isRequestPending: $isRequestPending');
+                          print('  isRequestAccepted: $isRequestAccepted');
+                          print('  requestStatus is not null: ${requestStatus != null}');
+                          print('  isUserHost: $isUserHost');
+                          print('  isEnded: $isEnded');
+                        }
                     
-                    // Check if request is accepted - this could be determined by:
-                    // 1. Badge text is "New Invite" (request accepted by host)
-                    // 2. Event status indicates user is attending
-                    // 3. User's request status from API (you may need to add this field)
-                    // For now, we'll check the badge text and event status
-                    final bool isRequestAccepted = badgeText == "New Invite" || 
-                        event.status.toLowerCase().contains('accepted') ||
-                        event.status.toLowerCase().contains('going') ||
-                        event.status.toLowerCase().contains('attending');
-                    
-                    // Show two buttons only when:
+                    // Show two buttons (Going!/Not Going) based on API request status
+                    // Only show when:
                     // - Event hasn't ended AND
-                    // - (Badge is "New Invite" OR request is accepted)
-                    final bool shouldShowTwoButtons = !isEnded && 
-                        (badgeText.trim() == "New Invite" || isRequestAccepted);
+                    // - API status is "accepted" AND can_confirm == true AND
+                    // - User is not the host
+                    // Note: If can_confirm == false, show "View Ticket" instead
+                    final bool shouldShowInvitationButtons = !isEnded &&
+                        !isUserHost &&
+                        isInvitationPending;
+
+                    final bool shouldShowTwoButtons = shouldShowInvitationButtons ||
+                        (!isEnded &&
+                            isRequestAccepted &&
+                            canConfirm &&
+                            !isUserHost &&
+                            !isInvitationAccepted);
+                        
+                        if (kDebugMode) {
+                          print('  [Button Display Logic] ===================');
+                          print('  [Button Display Logic] Event: ${event.title} (ID: ${event.id})');
+                          print('  [Button Display Logic] isEnded: $isEnded');
+                          print('  [Button Display Logic] isRequestAccepted: $isRequestAccepted');
+                          print('  [Button Display Logic] isUserHost: $isUserHost');
+                          print('  [Button Display Logic] shouldShowTwoButtons: $shouldShowTwoButtons');
+                          print('  [Button Display Logic] requestStatusString: "$requestStatusString"');
+                          print('  [Button Display Logic] ===================');
+                        }
                     
                     // Get cover images or use placeholder
                     final List<String> imageUrls = event.coverImages.isNotEmpty
@@ -536,35 +751,107 @@ class _HomePagesState extends State<HomePages> {
                       formattedTime = "$formattedTime onwards";
                     }
 
+                    // Determine card status for banner
+                    EventStatus? cardStatus;
+                    if (isUserHost && !isEnded) {
+                      cardStatus = EventStatus.hostedByCurrentUser;
+                    } else if (shouldShowViewTicket) {
+                      cardStatus = EventStatus.attending;
+                    }
+
                     return InviteEventCard(
                       badgeText: badgeText,
                       imageUrls: imageUrls,
                       title: event.title,
                       dateLocation: dateLocation,
                       hostName: event.host.name,
-                      starImagePath: "assets/icons/Group 1 (2).png",
+                      status: cardStatus,
+                      starImagePath: badgeIconPath,
                       isEnded: isEnded,
                       imagePath: isEnded
                           ? ''
                           : 'assets/images/button/Frame 19976 (4).png',
                       buttonLabel: (() {
-                        final buttonText = isEnded 
-                            ? null 
-                            : (isUserHost ? "View Request" : "Send Request");
-                        if (kDebugMode) {
-                          print('Button for ${event.title}: $buttonText (isUserHost: $isUserHost, isEnded: $isEnded)');
-                          print('  Event Host ID: ${event.host.id}, Phone: ${event.host.phoneNumber}');
-                          print('  Current User ID: $currentUserId, Phone: $currentUserPhoneNumber');
+                       
+                        if (isEnded) {
+                          if (kDebugMode) {
+                            print('  [Button Label] Event ended - returning null');
+                          }
+                          return null;
                         }
-                        return buttonText;
+                        
+                        if (isUserHost) {
+                          if (kDebugMode) {
+                            print('  [Button Label] User is host - returning "View Request"');
+                          }
+                          return "View Request";
+                        }
+                        
+                        // For invitations, do not show main CTA when accepted/declined/expired
+                        if (hasInvitation &&
+                            (isInvitationAccepted ||
+                                isInvitationDeclined ||
+                                isInvitationExpired)) {
+                          if (kDebugMode) {
+                            print('  [Button Label] Invitation status is $invitationStatus - hiding main CTA');
+                          }
+                          return null;
+                        }
+
+                        // Status: "accepted" AND can_confirm == false -> Show "View Ticket" button (takes precedence)
+                        if (shouldShowViewTicket) {
+                          if (kDebugMode) {
+                            print('  [Button Label] Status: accepted, can_confirm=false - returning "View Ticket"');
+                          }
+                          return "View Ticket";
+                        }
+                        
+                        // If showing two buttons, return null (buttonLabel is ignored when showTwoButtons=true)
+                        if (shouldShowTwoButtons) {
+                          if (kDebugMode) {
+                            print('  [Button Label] Showing two buttons - returning null');
+                          }
+                          return null;
+                        }
+                        
+                        // Status: "pending" -> Show "Requested to join" button
+                        if (isRequestPending) {
+                          if (kDebugMode) {
+                            print('  [Button Label] Status: pending - returning "Requested to join"');
+                          }
+                          return "Requested to join";
+                        }
+                        
+                        // Status: 404 (null) -> No request exists, show "Send Request" button
+                        if (kDebugMode) {
+                          print('  [Button Label] Status: 404 (no request) - returning "Send Request"');
+                          print('    Event ID: ${event.id}');
+                          print('    requestStatus is null: ${requestStatus == null}');
+                          print('    Status string was: "$requestStatusString"');
+                          print('    isRequestPending: $isRequestPending');
+                          print('    isRequestAccepted: $isRequestAccepted');
+                          print('    requestStatusMap contains event: ${requestStatusMap.containsKey(event.id)}');
+                        }
+                        return "Send Request";
                       })(),
-                      buttonVariant: LoopinButtonVariant.primary,
-                      showButton: !isEnded,
-                      showTwoButtons: shouldShowTwoButtons && !isUserHost, // Don't show two buttons for hosted events
-                      isPaid: event.isPaid,
-                      price: event.isPaid && event.ticketPrice != null
-                          ? event.ticketPrice
-                          : null,
+                      firstButtonText: "Going!", // Text for first button when showTwoButtons is true
+                buttonVariant: LoopinButtonVariant.primary,
+                      showButton: !isEnded &&
+                          !isInvitationAccepted &&
+                          !isInvitationDeclined &&
+                          !isInvitationExpired,
+                      showTwoButtons: shouldShowTwoButtons, // Show two buttons when request is accepted
+                      // Determine if event is paid based on ticket_price
+                      // If ticket_price is 00.00, 0.00, 0, null, or empty, event is free
+                      isPaid: !_isEventFree(event.ticketPrice),
+                      // Price logic:
+                      // - If ticket_price is 00.00/0.00/0/null/empty: pass null (will show "Free" in eventcard)
+                      // - Otherwise: pass ticketPrice (will show the price)
+                      price: _isEventFree(event.ticketPrice)
+                          ? null
+                          : (event.ticketPrice != null && event.ticketPrice!.isNotEmpty 
+                              ? event.ticketPrice 
+                              : null),
                       onUploadTap: () {
                         // Handle upload/share icon tap
                         print("Upload icon tapped for ${event.title}");
@@ -573,7 +860,8 @@ class _HomePagesState extends State<HomePages> {
                         if (kDebugMode) {
                           print('Event tapped: ${event.title}');
                           print('  isUserHost: $isUserHost, isEnded: $isEnded');
-                          print('  Button label: ${isEnded ? null : (isUserHost ? "View Request" : "Send Request")}');
+                          print('  Request status: ${requestStatusString}');
+                          print('  shouldShowViewTicket: $shouldShowViewTicket');
                         }
                         
                         // Handle different button actions
@@ -582,46 +870,200 @@ class _HomePagesState extends State<HomePages> {
                           return;
                         }
                         
+                        // If "View Ticket" button was clicked, navigate to EventDetail
+                        // EventDetail will handle navigation to BookedTicket
+                        if (shouldShowViewTicket) {
+                          if (kDebugMode) {
+                            print('View Ticket button clicked - navigating to EventDetail');
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EventDetail(
+                                eventId: event.id,
+                                title: event.title,
+                                date: formattedDate,
+                                time: formattedTime,
+                                hostName: event.host.name,
+                                hostImage: event.host.profileImage ??
+                                    "assets/images/avatar.png",
+                                eventImage: imageUrls.isNotEmpty
+                                    ? imageUrls[0]
+                                    : "assets/images/image (2).png",
+                                venue: event.location.name,
+                                fullAddress: event.location.address,
+                                aboutEvent: event.description,
+                                badgeText: badgeText,
+                                attendeesCount: event.goingCount,
+                                attendeeImages: const [
+                                  "assets/images/avatar.png",
+                                  "assets/images/ananya.png",
+                                  "assets/images/kabir.png",
+                                ],
+                                isGoing: false,
+                                price: _isEventFree(event.ticketPrice)
+                                    ? null
+                                    : (event.ticketPrice != null && event.ticketPrice!.isNotEmpty
+                                        ? event.ticketPrice
+                                        : null),
+                                starImagePath: "assets/icons/Group 1 (2).png",
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        
+                        // Navigate to EventDetail for all non-hosted events (regardless of status)
+                        // EventDetail will show the correct buttons based on status
                         if (isUserHost) {
                           // Navigate to MainScreen for hosted events
                           if (kDebugMode) {
                             print('Navigating to MainScreen for hosted event: ${event.title}');
                           }
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
                               builder: (context) => MainScreen(
                                 eventName: event.title,
-                                eventPrice: event.isPaid && event.ticketPrice != null
-                                    ? "₹ ${event.ticketPrice}"
-                                    : "Free",
+                                eventPrice: _isEventFree(event.ticketPrice)
+                                    ? "Free"
+                                    : (event.ticketPrice != null && event.ticketPrice!.isNotEmpty
+                                        ? "₹ ${event.ticketPrice}"
+                                        : "Free"),
                                 confirmedUsers: event.goingCount,
                                 invitedCount: 0,
                                 requestsCount: event.requestsCount,
                                 checkInCount: 0,
-                                eventId: event.id, // Pass event ID for real-time data
-                                eventStatus: event.status, // Pass event status
+                      ),
+                    ),
+                  );
+                        } else {
+                          // Navigate to EventDetail for non-hosted events
+                          if (kDebugMode) {
+                            print('Navigating to EventDetail for event: ${event.title}');
+                          }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetail(
+                                eventId: event.id, // Pass event ID for API calls
+                                title: event.title,
+                                date: formattedDate,
+                                time: formattedTime,
+                                hostName: event.host.name,
+                                hostImage: event.host.profileImage ??
+                          "assets/images/avatar.png",
+                                eventImage: imageUrls.isNotEmpty
+                                    ? imageUrls[0]
+                                    : "assets/images/image (2).png",
+                                venue: event.location.name,
+                                fullAddress: event.location.address,
+                                aboutEvent: event.description,
+                                badgeText: badgeText,
+                                attendeesCount: event.goingCount,
+                                attendeeImages: const [
+                          "assets/images/avatar.png",
+                          "assets/images/ananya.png",
+                          "assets/images/kabir.png",
+                        ],
+                        isGoing: false,
+                                price: _isEventFree(event.ticketPrice)
+                                    ? null
+                                    : (event.ticketPrice != null && event.ticketPrice!.isNotEmpty
+                                        ? event.ticketPrice
+                                        : null),
+                                starImagePath: "assets/icons/Group 1 (2).png",
                               ),
                             ),
                           );
-                        } else {
-                          // Send request for non-hosted events
-                          if (kDebugMode) {
-                            print('Sending request for event: ${event.title}');
-                          }
-                          _sendEventRequest(event, context);
                         }
                       },
                       onFirstButtonTap: () {
-                        // Handle "Going!" button tap
-                        print("Going button tapped for ${event.title}");
+                        // Handle "Going!" button tap - navigate to EventDetail
+                        // EventDetail will show the same buttons based on status
+                        if (kDebugMode) {
+                          print('Going! button tapped - navigating to EventDetail');
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EventDetail(
+                              eventId: event.id, // Pass event ID for API calls
+                              title: event.title,
+                              date: formattedDate,
+                              time: formattedTime,
+                              hostName: event.host.name,
+                              hostImage: event.host.profileImage ??
+                                  "assets/images/avatar.png",
+                              eventImage: imageUrls.isNotEmpty
+                                  ? imageUrls[0]
+                                  : "assets/images/image (2).png",
+                              venue: event.location.name,
+                              fullAddress: event.location.address,
+                              aboutEvent: event.description,
+                              badgeText: badgeText,
+                              attendeesCount: event.goingCount,
+                              attendeeImages: const [
+                                "assets/images/avatar.png",
+                                "assets/images/ananya.png",
+                                "assets/images/kabir.png",
+                              ],
+                              isGoing: false,
+                              price: _isEventFree(event.ticketPrice)
+                                  ? null
+                                  : (event.ticketPrice != null && event.ticketPrice!.isNotEmpty
+                                      ? event.ticketPrice
+                                      : null),
+                              starImagePath: "assets/icons/Group 1 (2).png",
+                            ),
+                          ),
+                        );
                       },
                       onSecondButtonTap: () {
-                        // Handle "Not Going :(" button tap
-                        print("Not Going button tapped for ${event.title}");
+                        // Handle "Not Going" button tap - navigate to EventDetail
+                        // EventDetail will show the same buttons based on status
+                        if (kDebugMode) {
+                          print('Not Going button tapped - navigating to EventDetail');
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EventDetail(
+                              eventId: event.id, // Pass event ID for API calls
+                              title: event.title,
+                              date: formattedDate,
+                              time: formattedTime,
+                              hostName: event.host.name,
+                              hostImage: event.host.profileImage ??
+                                  "assets/images/avatar.png",
+                              eventImage: imageUrls.isNotEmpty
+                                  ? imageUrls[0]
+                                  : "assets/images/image (2).png",
+                              venue: event.location.name,
+                              fullAddress: event.location.address,
+                              aboutEvent: event.description,
+                              badgeText: badgeText,
+                              attendeesCount: event.goingCount,
+                              attendeeImages: const [
+                                "assets/images/avatar.png",
+                                "assets/images/ananya.png",
+                                "assets/images/kabir.png",
+                              ],
+                              isGoing: false,
+                              price: _isEventFree(event.ticketPrice)
+                                  ? null
+                                  : (event.ticketPrice != null && event.ticketPrice!.isNotEmpty
+                                      ? event.ticketPrice
+                                      : null),
+                              starImagePath: "assets/icons/Group 1 (2).png",
+                            ),
+                          ),
+                        );
                       },
                     );
                       }).toList(),
+                    );
+                      },
                     );
                   },
                 );

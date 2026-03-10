@@ -29,13 +29,13 @@ class _WaitNavigationBarState extends State<WaitNavigationBar> {
     super.dispose();
   }
 
+  // Only two items: Home and Profile (removed the middle/star option)
   final List<String> _icons = [
     'assets/icons/Homes.png',
-    'assets/icons/Stars.png',
     "assets/icons/User.png",
   ];
 
-  final List<String> _labels = ["Home", "Wall", "Profile"];
+  final List<String> _labels = ["Home", "Profile"];
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +46,7 @@ class _WaitNavigationBarState extends State<WaitNavigationBar> {
       child: Center(
         child: Container(
           height: 65,
-          width: 239,
+          width: 180,
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
         decoration: BoxDecoration(
           color: const Color.fromRGBO(16, 16, 16, 0.80),

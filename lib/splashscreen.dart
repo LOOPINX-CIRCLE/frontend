@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:text_code/core/services/auth_service.dart';
+import 'package:text_code/core/services/secure_storage_service.dart';
+import 'package:text_code/core/services/payment_service.dart';
+import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
+import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_fail_sucess/sucess_full_payment.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_fail_sucess/failed.dart';
 
 import 'package:video_player/video_player.dart';
 // The screen to navigate to
@@ -56,6 +66,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // Check if the widget is still in the tree before navigating
     if (mounted) {
+      // First check for pending UPI payment (app might have been killed during payment)
+      final hasPendingPayment = await _checkPendingPayment();
+      if (hasPendingPayment) {
+        // Pending payment was handled, don't navigate to MobileNo
+        return;
+      }
+
       // Always navigate to mobile number page (skip auto-login)
       Navigator.pushReplacement(
         context,
@@ -67,6 +84,157 @@ class _SplashScreenState extends State<SplashScreen> {
           transitionDuration: const Duration(milliseconds: 500),
         ),
       );
+    }
+  }
+
+  /// Check for pending payment and handle it
+  /// Returns true if there was a pending payment that was handled
+  Future<bool> _checkPendingPayment() async {
+    try {
+      final secureStorage = SecureStorageService();
+      final pendingPayment = await secureStorage.getPendingPayment();
+
+      if (pendingPayment == null) {
+        if (kDebugMode) {
+          print('No pending payment found');
+        }
+        return false;
+      }
+
+      final orderId = pendingPayment['orderId'] as String;
+      final eventId = pendingPayment['eventId'] as int;
+
+      if (kDebugMode) {
+        print('Found pending payment: orderId=$orderId, eventId=$eventId');
+        print('Checking payment status...');
+      }
+
+      // Check if user is logged in first
+      final authService = AuthService();
+      final token = await authService.getStoredToken();
+      
+      if (token == null || token.isEmpty) {
+        if (kDebugMode) {
+          print('User not logged in, clearing pending payment');
+        }
+        await secureStorage.clearPendingPayment();
+        return false;
+      }
+
+      // Check payment status
+      final paymentService = PaymentService();
+      final orderResponse = await paymentService.getPaymentOrder(orderId);
+      final status = orderResponse.data.order.status.toLowerCase();
+
+      if (kDebugMode) {
+        print('Pending payment status: $status');
+      }
+
+      if (status == 'paid') {
+        // Payment was successful! Fetch ticket and navigate to success
+        if (kDebugMode) {
+          print('Payment was successful! Fetching ticket...');
+        }
+        
+        await _handleSuccessfulPendingPayment(eventId);
+        await secureStorage.clearPendingPayment();
+        return true;
+      } else if (status == 'failed' || status == 'expired') {
+        // Payment failed, navigate to failure screen
+        if (kDebugMode) {
+          print('Payment failed or expired');
+        }
+        await secureStorage.clearPendingPayment();
+        
+        if (mounted) {
+          Get.off(() => const Failed());
+        }
+        return true;
+      } else {
+        // Payment still pending - clear it and let user retry
+        if (kDebugMode) {
+          print('Payment still pending/created - clearing');
+        }
+        await secureStorage.clearPendingPayment();
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error checking pending payment: $e');
+      }
+      // Clear pending payment on error
+      final secureStorage = SecureStorageService();
+      await secureStorage.clearPendingPayment();
+      return false;
+    }
+  }
+
+  /// Handle successful pending payment - fetch ticket and navigate to success
+  Future<void> _handleSuccessfulPendingPayment(int eventId) async {
+    try {
+      final eventRequestService = EventRequestService();
+      final ticketData = await eventRequestService.getTicket(eventId);
+
+      if (kDebugMode) {
+        print('Ticket fetched for pending payment: $ticketData');
+      }
+
+      // Initialize controllers
+      final eventController = Get.put(EventController());
+      final ticketController = Get.put(UserTicketController());
+
+      // Extract ticket data
+      final ticketSecret = ticketData['ticket_secret']?.toString() ?? '';
+      final eventTitle = ticketData['event_title']?.toString() ?? '';
+      final venueName = ticketData['venue_name']?.toString() ?? '';
+      final eventStartTime = ticketData['event_start_time']?.toString() ?? '';
+      final coverImageUrl = ticketData['cover_image_url']?.toString() ?? '';
+
+      // Format date
+      String formattedDate = 'Date TBD';
+      if (eventStartTime.isNotEmpty) {
+        try {
+          final dateTime = DateTime.parse(eventStartTime);
+          formattedDate = DateFormat('EEEE d, MMMM yyyy').format(dateTime);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error parsing date: $e');
+          }
+        }
+      }
+
+      // Create ticket
+      final ticket = UserTicket(
+        title: eventTitle,
+        date: formattedDate,
+        location: venueName,
+        code: ticketSecret,
+        eventImage: coverImageUrl.isNotEmpty ? coverImageUrl : 'assets/images/image (1).png',
+      );
+
+      ticketController.addTicket(ticket);
+
+      // Update event controller
+      eventController.eventTitle.value = eventTitle;
+      eventController.loaction.value = venueName;
+      eventController.date.value = formattedDate;
+      eventController.eventId.value = eventId;
+      if (coverImageUrl.isNotEmpty) {
+        eventController.eventImage.value = coverImageUrl;
+      }
+
+      // Navigate to success screen
+      if (mounted) {
+        Get.off(() => const SucessFullPayment());
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error handling successful pending payment: $e');
+      }
+      // Still navigate to success even if ticket fetch fails
+      if (mounted) {
+        Get.off(() => const SucessFullPayment());
+      }
     }
   }
 

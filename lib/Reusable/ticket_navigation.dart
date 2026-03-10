@@ -30,14 +30,15 @@ class TicketInfoCard extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Container(
-              width: 351,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height - 32,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 351.0,
               ),
+            child: Container(
+                width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: const Color(0xFF0D0D0D), // background color
@@ -49,7 +50,7 @@ class TicketInfoCard extends StatelessWidget {
                     43,
                     0.5,
                   ), // border color with opacity
-                  width: 2,
+                  width: 2.0,
                 ),
               ),
               child: Column(
@@ -65,8 +66,12 @@ class TicketInfoCard extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Ticket Info Card
-                  Container(
-                    width: 290,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxWidth: 290,
+                    ),
+                    child: Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: const Color.fromARGB(255, 23, 23, 23),
@@ -90,6 +95,7 @@ class TicketInfoCard extends StatelessWidget {
                         ],
                       ],
                     ),
+                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -101,7 +107,7 @@ class TicketInfoCard extends StatelessWidget {
                             padding: EdgeInsets.zero,
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
-                            minimumSize: const Size(298, 60),
+                            minimumSize: const Size(298.0, 60.0),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -110,14 +116,14 @@ class TicketInfoCard extends StatelessWidget {
                             padding: const EdgeInsets.all(4.0),
                             child: Image.asset(
                               imageButtonPath ?? "",
-                              height: 60,
-                              width: 298,
+                              height: 60.0,
+                              width: 298.0,
                             ),
                           ),
                         )
                       : LoopinCtaButton(
                           label: buttonText,
-                          width: 298,
+                          width: 298.0,
                           onPressed: onButtonPressed,
                         ),
 
@@ -131,6 +137,7 @@ class TicketInfoCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
               ),
             ),
           ),
@@ -162,16 +169,27 @@ class TicketInfoCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          // Title - Flexible to prevent overflow
+          Flexible(
+            flex: 2,
+            child: Text(
             title,
             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
           ),
+          const SizedBox(width: 8.0), // Add spacing between title and value
+          // Value - Flexible to prevent overflow
           Flexible(
+            flex: 3,
             child: Text(
               value,
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
+              maxLines: 2,
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: isBold ? FontWeight.bold : FontWeight.normal,

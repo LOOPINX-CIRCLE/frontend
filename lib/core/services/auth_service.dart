@@ -41,7 +41,7 @@ class AuthService {
       }
       
       final response = await _apiClient.post(
-        '/auth/signup',
+        '/api/auth/signup',
         body: {
           'phone_number': formattedPhoneNumber, // Use snake_case with country code prefix
         },
@@ -94,7 +94,7 @@ class AuthService {
       }
       
       final response = await _apiClient.post(
-        '/auth/verify-otp',
+        '/api/auth/verify-otp',
         body: {
           'phone_number': formattedPhoneNumber, // Use snake_case with country code prefix
           'otp_code': otp, // Use otp_code instead of otp
@@ -157,7 +157,7 @@ class AuthService {
       }
 
       final response = await _apiClient.get(
-        '/auth/event-interests',
+        '/api/auth/event-interests',
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -214,7 +214,7 @@ class AuthService {
       }
 
       final response = await _apiClient.get(
-        '/auth/profile',
+        '/api/auth/profile',
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -352,15 +352,15 @@ class AuthService {
         }
       }
 
-      if (files.length < 4) {
+      if (files.length < 1) {
         throw ApiException(
-          message: 'At least 4 profile pictures are required',
+          message: 'At least 1 profile picture is required',
           statusCode: 400,
         );
       }
 
       final response = await _apiClient.postMultipart(
-        '/auth/complete-profile',
+        '/api/auth/complete-profile',
         fields: fields,
         files: files,
         headers: {
@@ -435,7 +435,7 @@ class AuthService {
       }
 
       final response = await _apiClient.post(
-        '/auth/complete-profile',
+        '/api/auth/complete-profile',
         headers: {
           'Authorization': 'Bearer $token',
         },

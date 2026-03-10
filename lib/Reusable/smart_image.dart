@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:text_code/core/utils/image_utils.dart';
 
-/// A smart image widget that automatically handles both network URLs and local assets
+/// A smart image widget that automatically handles both network URLs, API-relative URLs, and local assets
 /// 
 /// This widget prevents Flutter Web from trying to load network URLs as assets,
 /// which causes 404 errors. It automatically detects if the image path is a URL
@@ -93,6 +94,12 @@ class SmartImage extends StatelessWidget {
            imagePath.startsWith('//');
   }
 
+  /// Check if the image path is an API-relative URL (e.g. "/api/media/...")
+  /// These should be resolved against the API base URL instead of treated as assets.
+  bool get _isApiRelativePath {
+    return imagePath.startsWith('/');
+  }
+
   /// Convert Google Drive share URL to direct image URL if needed
   String _processGoogleDriveUrl(String url) {
     // Handle Google Drive share URLs
@@ -121,9 +128,10 @@ class SmartImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_isNetworkImage) {
-      // Process Google Drive URLs if needed
-      final processedUrl = _processGoogleDriveUrl(imagePath);
+    if (_isNetworkImage || _isApiRelativePath) {
+      // Resolve API-relative paths and process Google Drive URLs if needed
+      final resolvedUrl = resolveImageUrl(imagePath);
+      final processedUrl = _processGoogleDriveUrl(resolvedUrl);
       
       Widget imageWidget = Image.network(
         processedUrl,

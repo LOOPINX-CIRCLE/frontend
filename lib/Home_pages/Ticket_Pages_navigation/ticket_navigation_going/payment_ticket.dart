@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
-import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_fail_sucess/sucess_full_payment.dart';
-import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_fail_sucess/failed.dart';
+import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_navigation_going/payu_webview_screen.dart';
+import 'package:text_code/core/models/payment_order_response.dart';
 import 'package:text_code/Reusable/customer_appbar.dart';
 import 'package:text_code/Reusable/text_Bricolage%20Grotesque_reusable.dart';
 import 'package:text_code/Reusable/text_reusable.dart';
 
 class PaymentTicket extends StatefulWidget {
-  const PaymentTicket({super.key});
+  final PaymentOrderResponse? paymentResponse;
+
+  const PaymentTicket({
+    super.key,
+    this.paymentResponse,
+  });
 
   @override
   State<PaymentTicket> createState() => _PaymentTicketState();
@@ -17,32 +23,35 @@ class PaymentTicket extends StatefulWidget {
 
 class _PaymentTicketState extends State<PaymentTicket> {
   final EventController eventController = Get.find<EventController>();
-  bool isProcessing = false;
 
-  void _processPayment({bool forceFailure = false}) {
-    setState(() {
-      isProcessing = true;
-    });
-
-    // Simulate payment processing
-    Future.delayed(const Duration(seconds: 2), () {
-      // Simulate payment success/failure
-      // In real app, this would be actual payment gateway response
-      // For testing: Tap and hold the Pay button for 2 seconds to simulate failure
-      final bool paymentSuccess = !forceFailure;
-      
-      if (paymentSuccess) {
-        // Navigate to success screen
-        Get.to(() => const SucessFullPayment());
-      } else {
-        // Navigate to failed screen
-        Get.to(() => const Failed());
-      }
-      
-      setState(() {
-        isProcessing = false;
+  @override
+  void initState() {
+    super.initState();
+    // If payment response is provided, redirect to PayU immediately
+    if (widget.paymentResponse != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _redirectToPayU();
       });
-    });
+    }
+  }
+
+  void _redirectToPayU() {
+    if (widget.paymentResponse == null) {
+      if (kDebugMode) {
+        print('ERROR: Payment response is null');
+      }
+      Get.back();
+      return;
+    }
+
+    if (kDebugMode) {
+      print('Redirecting to PayU payment gateway...');
+    }
+
+    // Navigate to PayU WebView screen
+    Get.to(() => PayUWebViewScreen(
+      paymentResponse: widget.paymentResponse!,
+    ));
   }
 
   @override
@@ -90,7 +99,7 @@ class _PaymentTicketState extends State<PaymentTicket> {
                     const SizedBox(height: 12),
                     _buildSummaryRow("Venue", eventController.loaction.value),
                     const SizedBox(height: 12),
-                    _buildSummaryRow("Date & Time", eventController.dateTime),
+                    _buildSummaryRow("Date", eventController.date.value),
                     const SizedBox(height: 12),
                     const Divider(color: Colors.grey, height: 24),
                     _buildSummaryRow(
@@ -104,86 +113,17 @@ class _PaymentTicketState extends State<PaymentTicket> {
               ),
               const SizedBox(height: 40),
               
-              // Payment Methods
-              TextBricolage(
-                FontWeight.w600,
-                "Select Payment Method",
-                18,
-              ),
-              const SizedBox(height: 16),
-              
-              // Payment method cards
-              _buildPaymentMethodCard(
-                "UPI",
-                "Pay using UPI",
-                Icons.account_balance_wallet,
-                isSelected: true,
-              ),
-              const SizedBox(height: 12),
-              _buildPaymentMethodCard(
-                "Credit/Debit Card",
-                "Pay using card",
-                Icons.credit_card,
-              ),
-              const SizedBox(height: 12),
-              _buildPaymentMethodCard(
-                "Net Banking",
-                "Pay using net banking",
-                Icons.account_balance,
-              ),
-              
-              const SizedBox(height: 40),
-              
-              // Pay Button - Single tap for success, Long press for failure
-              SizedBox(
-                width: double.infinity,
-                child: GestureDetector(
-                  onLongPress: () {
-                    if (!isProcessing) {
-                      _processPayment(forceFailure: true); // Simulate payment failure
-                    }
-                  },
-                  child: ElevatedButton(
-                    onPressed: isProcessing ? null : () => _processPayment(), // Simulate payment success
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.grey, width: 1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: isProcessing
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            "Pay ₹${eventController.ticketPrice.value}",
-                            style: GoogleFonts.bricolageGrotesque(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+              // Loading indicator while redirecting to PayU
+              const Center(
+                child: Column(
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 16),
+                    Text(
+                      'Redirecting to payment gateway...',
+                      style: TextStyle(color: Colors.white70),
                   ),
-                ),
-              ),
-              
-              // Helper text for testing
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  "💡 Tip: Long press for payment failure",
-                  style: GoogleFonts.bricolageGrotesque(
-                    fontSize: 12,
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -217,56 +157,5 @@ class _PaymentTicketState extends State<PaymentTicket> {
     );
   }
 
-  Widget _buildPaymentMethodCard(String title, String subtitle, IconData icon, {bool isSelected = false}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.grey[900] : Colors.grey[950],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isSelected ? Colors.white : Colors.grey[800]!,
-          width: isSelected ? 2 : 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey[800],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.bricolageGrotesque(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.bricolageGrotesque(
-                    fontSize: 12,
-                    color: Colors.grey[400],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isSelected)
-            const Icon(Icons.check_circle, color: Colors.green, size: 24),
-        ],
-      ),
-    );
-  }
 }
 

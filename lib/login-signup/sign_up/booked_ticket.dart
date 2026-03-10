@@ -1,9 +1,17 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:text_code/login-signup/sign_up/share_invite.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
+import 'package:text_code/Reusable/smart_image.dart';
+import 'package:text_code/core/services/ticket_service.dart';
+import 'package:text_code/core/network/api_exception.dart';
+import 'package:text_code/core/utils/image_utils.dart';
+import 'package:text_code/Home_pages/Controller/home_page.dart';
+import 'package:text_code/core/models/event.dart';
 
 class BookedTicket extends StatefulWidget {
   const BookedTicket({super.key, this.showTabs = true});
@@ -16,6 +24,263 @@ class BookedTicket extends StatefulWidget {
 
 class _BookedTicketState extends State<BookedTicket> {
   final UserTicketController ticketController = Get.put(UserTicketController());
+  final TicketService _ticketService = TicketService();
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTickets();
+  }
+
+  /// Format date from API response (ISO 8601 format)
+  String _formatDate(String? dateTimeString) {
+    if (dateTimeString == null || dateTimeString.isEmpty) {
+      return '';
+    }
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('EEEE d, MMMM yyyy').format(dateTime);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error parsing date: $e');
+      }
+      return '';
+    }
+  }
+
+  /// Format time from API response (ISO 8601 format)
+  String _formatTime(String? dateTimeString) {
+    if (dateTimeString == null || dateTimeString.isEmpty) {
+      return '';
+    }
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('h:mm a').format(dateTime);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error parsing time: $e');
+      }
+      return '';
+    }
+  }
+
+  /// Get first non-null string from map for given keys (API may use different names).
+  String? _stringFromKeys(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final v = map[key]?.toString();
+      if (v != null && v.isNotEmpty) return v;
+    }
+    return null;
+  }
+
+  /// Extract venue from my-tickets item (flat or nested under event/location).
+  String _venueFromTicketData(Map<String, dynamic> ticketData) {
+    // Flat keys
+    final flat = _stringFromKeys(ticketData, ['venue_name', 'venue', 'location_name']);
+    if (flat != null && flat.isNotEmpty) return flat;
+    final locVal = ticketData['location'];
+    if (locVal is String && locVal.isNotEmpty) return locVal;
+    // Nested: event.venue_name, event.location.name, event.location_name, location.name
+    final event = ticketData['event'];
+    if (event is Map<String, dynamic>) {
+      final fromEvent = _stringFromKeys(event, ['venue_name', 'venue', 'location_name']);
+      if (fromEvent != null && fromEvent.isNotEmpty) return fromEvent;
+      final loc = event['location'];
+      if (loc is Map<String, dynamic>) {
+        final name = _stringFromKeys(loc, ['name', 'venue_name', 'address']);
+        if (name != null && name.isNotEmpty) return name;
+      }
+    }
+    final loc = ticketData['location'];
+    if (loc is Map<String, dynamic>) {
+      final name = _stringFromKeys(loc, ['name', 'venue_name', 'address']);
+      if (name != null && name.isNotEmpty) return name;
+    }
+    return '';
+  }
+
+  /// Extract cover image URL from my-tickets item (flat or nested under event).
+  String _coverImageFromTicketData(Map<String, dynamic> ticketData) {
+    // Flat keys
+    final flat = _stringFromKeys(ticketData, [
+      'cover_image_url', 'cover_image', 'image_url', 'event_cover_image',
+      'event_image', 'image', 'cover_image_path',
+    ]);
+    if (flat != null && flat.isNotEmpty) return flat;
+    // Nested: event.cover_image_url, event.cover_images[0], event.cover_image
+    final event = ticketData['event'];
+    if (event is Map<String, dynamic>) {
+      final fromEvent = _stringFromKeys(event, [
+        'cover_image_url', 'cover_image', 'image_url', 'event_cover_image',
+        'event_image', 'image',
+      ]);
+      if (fromEvent != null && fromEvent.isNotEmpty) return fromEvent;
+      final covers = event['cover_images'];
+      if (covers is List && covers.isNotEmpty) {
+        final first = covers.first;
+        if (first is String) return first;
+        if (first is Map && first['url'] != null) return first['url'].toString();
+      }
+    }
+    return '';
+  }
+
+  /// Extract event ID from my-tickets item (flat or nested under event).
+  int? _eventIdFromTicketData(Map<String, dynamic> ticketData) {
+    final id = ticketData['event_id'];
+    if (id != null) {
+      if (id is int) return id;
+      final parsed = int.tryParse(id.toString());
+      if (parsed != null) return parsed;
+    }
+    final event = ticketData['event'];
+    if (event is Map<String, dynamic>) {
+      final eid = event['id'];
+      if (eid != null) {
+        if (eid is int) return eid;
+        final parsed = int.tryParse(eid.toString());
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
+  /// Find event from home page list by ID (for cover image and venue).
+  Event? _eventFromHomePage(int? eventId) {
+    if (eventId == null) return null;
+    try {
+      if (!Get.isRegistered<HomePageController>()) return null;
+      final controller = Get.find<HomePageController>();
+      for (final event in controller.events) {
+        if (event.id == eventId) return event;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Fetch all tickets from API
+  Future<void> _fetchTickets() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      if (kDebugMode) {
+        print('Fetching all user tickets...');
+      }
+
+      // Fetch tickets from API
+      final ticketsData = await _ticketService.getAllUserTickets();
+
+      if (kDebugMode) {
+        print('Fetched ${ticketsData.length} tickets from API');
+      }
+
+      // Clear existing tickets
+      ticketController.tickets.clear();
+
+      // Convert API response to UserTicket objects
+      for (final ticketData in ticketsData) {
+        if (kDebugMode) {
+          print('Processing ticket data: $ticketData');
+        }
+
+        final eventTitle = _stringFromKeys(ticketData, ['event_title', 'event_name', 'title']) ?? '';
+        final venueName = _venueFromTicketData(ticketData);
+        final startTime = ticketData['event_start_time']?.toString() ??
+            ticketData['start_time']?.toString() ??
+            (ticketData['event'] != null
+                ? (ticketData['event'] as Map<String, dynamic>)['start_time']?.toString()
+                : null);
+        final ticketSecret = ticketData['ticket_secret']?.toString() ??
+            ticketData['secret']?.toString() ??
+            '';
+
+        final coverImageUrlRaw = _coverImageFromTicketData(ticketData);
+
+        // Resolve image URL from API (handles relative paths)
+        String coverImageUrl = coverImageUrlRaw.isNotEmpty
+            ? resolveImageUrl(coverImageUrlRaw)
+            : '';
+
+        // Prefer cover image and venue from home page event if available
+        String displayVenue = venueName;
+        final eventId = _eventIdFromTicketData(ticketData);
+        final homeEvent = _eventFromHomePage(eventId);
+        if (homeEvent != null) {
+          if (homeEvent.location.name.isNotEmpty) {
+            displayVenue = homeEvent.location.name;
+          }
+          if (homeEvent.coverImages.isNotEmpty) {
+            final first = homeEvent.coverImages.first;
+            coverImageUrl = first.startsWith('http') ? first : resolveImageUrl(first);
+          }
+        }
+
+        if (kDebugMode) {
+          print('Ticket details:');
+          print('  Event Title: $eventTitle');
+          print('  Venue Name: $displayVenue (from ${homeEvent != null ? "home" : "API"})');
+          print('  Cover Image URL (raw): $coverImageUrlRaw');
+          print('  Ticket Secret: $ticketSecret');
+          print('  Cover Image URL (resolved): $coverImageUrl');
+        }
+
+        // Format date and time
+        final formattedDate = _formatDate(startTime);
+        final formattedTime = _formatTime(startTime);
+        final dateTimeString = formattedDate.isNotEmpty && formattedTime.isNotEmpty
+            ? '$formattedDate, $formattedTime'
+            : formattedDate.isNotEmpty
+                ? formattedDate
+                : '';
+
+        // Create UserTicket object
+        final ticket = UserTicket(
+          title: eventTitle,
+          date: dateTimeString,
+          location: displayVenue.isNotEmpty ? displayVenue : 'Venue TBD',
+          code: ticketSecret,
+          eventImage: coverImageUrl.isNotEmpty
+              ? coverImageUrl
+              : "assets/images/image (1).png",
+        );
+
+        // Add to controller
+        ticketController.addTicket(ticket);
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (kDebugMode) {
+        print('Successfully loaded ${ticketController.tickets.length} tickets');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching tickets: $e');
+      }
+
+      String errorMessage = 'Failed to load tickets. Please try again.';
+      if (e is ApiException) {
+        errorMessage = e.message;
+        if (e.statusCode == 401) {
+          errorMessage = 'Please log in to view your tickets.';
+        } else if (e.statusCode == 408) {
+          errorMessage = 'Request timed out. Please check your connection.';
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = errorMessage;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,47 +335,70 @@ class _BookedTicketState extends State<BookedTicket> {
                 ),
               ] else
                 const SizedBox(height: 8),
-              // Dynamically generated tickets from controller
-              Obx(() => Column(
-                children: ticketController.tickets.map((ticket) => TicketCard(
-                  image: ticket.eventImage,
-                  title: ticket.title,
-                  date: ticket.date,
-                  time: ticket.time,
-                  location: ticket.location,
-                  code: ticket.code,
-                  invites: ticket.invites,
-                  buttonImage: ticket.buttonImage,
-                  eventId: ticket.eventId,
-                )).toList(),
-              )),
-              // Static tickets (can be kept for demo)
-              const TicketCard(
-                image: "assets/images/frame1.png",
-                title: "Beauty Queen",
-                date: "17 July, 2025",
-                time: "2:00 PM",
-                location: "Romeo Lane, Dehradun",
-                code: "1998",
-                // invites: "+3 Invites",
-                // buttonImage: "assets/images/share_Invite.png",
-              ),
-              const TicketCard(
-                image: "assets/images/frame2.png",
-                title: "Tyler Event",
-                date: "23 September, 2025",
-                time: "8:00 PM",
-                location: "Bastian, Bangalore",
-                code: "3654",
-              ),
-              const TicketCard(
-                image: "assets/images/frame3.png",
-                title: "Pickle Ball",
-                date: "27 July, 2025",
-                time: "4:00 PM",
-                location: "Underdoggs, Dehradun",
-                code: "3864",
-              ),
+              // Loading state
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(40.0),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                )
+              // Error state
+              else if (_errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.all(40.0),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _fetchTickets,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              // Tickets list
+              else
+                Obx(() {
+                  if (ticketController.tickets.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.all(40.0),
+                      child: Center(
+                        child: Text(
+                          'No tickets yet',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: ticketController.tickets.map((ticket) => TicketCard(
+                      image: ticket.eventImage,
+                      title: ticket.title,
+                      date: ticket.date,
+                      location: ticket.location,
+                      code: ticket.code,
+                      invites: ticket.invites,
+                      buttonImage: ticket.buttonImage,
+                    )).toList(),
+                  );
+                }),
               const SizedBox(height: 24),
             ],
           ),
@@ -134,7 +422,6 @@ class TicketCard extends StatelessWidget {
   final String image;
   final String title;
   final String date;
-  final String time;
   final String location;
   final String code;
   final String? invites; // optional invite badge
@@ -146,7 +433,6 @@ class TicketCard extends StatelessWidget {
     required this.image,
     required this.title,
     required this.date,
-    required this.time,
     required this.location,
     required this.code,
     this.invites,
@@ -214,8 +500,8 @@ class TicketCard extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 12.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.asset(
-                          image,
+                        child: SmartImage(
+                          imagePath: image,
                           width: 82,
                           height: 82,
                           fit: BoxFit.cover,
@@ -230,7 +516,7 @@ class TicketCard extends StatelessWidget {
               // Event details
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.only(top: 10, bottom: 10, right: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -242,41 +528,24 @@ class TicketCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            date,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Image.asset(
-                            'assets/images/dot.png',
-                            width: 12,
-                            height: 12,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            time,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        date,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                       const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 40.0),
-                        child: const Divider(
-                          color: Colors.white24,
-                          thickness: 1,
-                          height: 1,
-                        ),
+                      const Divider(
+                        color: Colors.white24,
+                        thickness: 1,
+                        height: 1,
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -304,15 +573,18 @@ class TicketCard extends StatelessWidget {
                             "Secret Code ",
                             style: TextStyle(
                               color: Colors.white70,
-                              fontSize: 12,
+                              fontSize: 10,
                             ),
                           ),
-                          Text(
-                            code,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                          Flexible(
+                            child: Text(
+                              code,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],

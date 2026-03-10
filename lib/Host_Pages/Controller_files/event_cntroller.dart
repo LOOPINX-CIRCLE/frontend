@@ -16,6 +16,7 @@ class EventController extends GetxController {
   var latitude = 0.0.obs;
   var longitude = 0.0.obs;
   var eventImage = "".obs; // Event image for tickets
+  var eventId = 0.obs; // Event ID for API calls
   var locationPlaceId = "".obs;
   var locationCountryCode = "".obs;
 
