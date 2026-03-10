@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
+import 'package:text_code/core/services/invitation_service.dart';
+import 'package:text_code/core/utils/image_url_helper.dart';
 
 class EventConfirmed extends StatefulWidget {
   final List<User> users;
   final bool isCheckInMode; // Flag to determine if it's check-in mode
+  final int? eventId; // For check-in API calls
+  final DateTime? eventDateTime; // For check-in time validation (3 hours before)
 
   const EventConfirmed({
     super.key,
     required this.users,
     this.isCheckInMode = false,
+    this.eventId,
+    this.eventDateTime,
   });
 
   @override
@@ -19,12 +26,106 @@ class EventConfirmed extends StatefulWidget {
 class _EventConfirmedState extends State<EventConfirmed> {
   // Track check-in state separately for check-in mode
   final Map<String, bool> _checkInState = {};
+  final InvitationService _invitationService = InvitationService();
+  String? _checkingInUserId; // Track which user is currently being checked in
 
   // Generate 4-digit secret code based on user ID
   String _generateSecretCode(String userId) {
     // Generate a consistent code based on user ID
     final hash = userId.hashCode.abs();
     return (1000 + (hash % 9000)).toString();
+  }
+
+  /// Check if check-in is allowed (3 hours before event or after)
+  bool _isCheckInAllowed() {
+    if (widget.eventDateTime == null) {
+      return false; // No event time specified
+    }
+
+    final now = DateTime.now();
+    final threeHoursBefore = widget.eventDateTime!.subtract(const Duration(hours: 3));
+    
+    // Check-in is allowed from 3 hours before event until now (and after event)
+    return now.isAfter(threeHoursBefore);
+  }
+
+  /// Check user in via API
+  Future<void> _checkInUser(String userId) async {
+    if (widget.eventId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event ID not available')),
+      );
+      return;
+    }
+
+    try {
+      // Set loading state for this user
+      setState(() => _checkingInUserId = userId);
+
+      final userIdInt = int.tryParse(userId);
+      if (userIdInt == null) {
+        throw Exception('Invalid user ID');
+      }
+
+      final success = await _invitationService.checkInUser(
+        eventId: widget.eventId!,
+        userId: userIdInt,
+      );
+
+      if (success && mounted) {
+        setState(() {
+          _checkInState[userId] = true;
+          _checkingInUserId = null; // Clear loading state
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ User checked in successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error checking in user: $e');
+      }
+      if (mounted) {
+        setState(() => _checkingInUserId = null); // Clear loading state
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Load check-in status from API
+  Future<void> _loadCheckInStatus() async {
+    if (widget.eventId == null || !widget.isCheckInMode) {
+      return;
+    }
+
+    try {
+      final checkInMap = await _invitationService.getCheckInStatus(widget.eventId!);
+
+      if (mounted) {
+        setState(() {
+          for (var user in widget.users) {
+            final userIdInt = int.tryParse(user.id);
+            if (userIdInt != null) {
+              _checkInState[user.id] = checkInMap[userIdInt] ?? false;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading check-in status: $e');
+      }
+      // Error handled silently
+    }
   }
 
   @override
@@ -37,6 +138,8 @@ class _EventConfirmedState extends State<EventConfirmed> {
           _checkInState[user.id] = false; // Start with false (Check-in button)
         }
       }
+      // Load actual check-in status from API
+      _loadCheckInStatus();
     }
   }
 
@@ -60,9 +163,18 @@ class _EventConfirmedState extends State<EventConfirmed> {
         }
 
         void toggleCheckIn(String userId) {
-          setState(() {
-            _checkInState[userId] = !(_checkInState[userId] ?? false); // Toggle checked-in state
-          });
+          if (!_isCheckInAllowed()) {
+            final timeUntilCheckIn = widget.eventDateTime?.difference(DateTime.now()).inHours ?? 0;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Check-in opens 3 hours before event starts (in ~$timeUntilCheckIn hours)'),
+              ),
+            );
+            return;
+          }
+
+          // Call API to check in user
+          _checkInUser(userId);
         }
         
         bool isUserCheckedIn(String userId) {
@@ -72,6 +184,11 @@ class _EventConfirmedState extends State<EventConfirmed> {
           }
           // In check-in mode, use the checkInState map
           return _checkInState[userId] ?? false;
+        }
+
+        /// Get check-in button state (enabled/disabled based on time)
+        bool isCheckInEnabled() {
+          return widget.isCheckInMode && _isCheckInAllowed();
         }
 
         // If check-in mode, show Guest List UI
@@ -189,7 +306,20 @@ class _EventConfirmedState extends State<EventConfirmed> {
                                 children: [
                                   CircleAvatar(
                                     radius: 24,
-                                    backgroundImage: AssetImage(user.imagePath),
+                                    backgroundColor: Colors.grey[700],
+                                    backgroundImage: (user.imagePath.startsWith('assets'))
+                                        ? AssetImage(user.imagePath) as ImageProvider
+                                        : NetworkImage(imageUrl(user.imagePath)),
+                                    onBackgroundImageError: (error, stackTrace) {
+                                      if (kDebugMode) {
+                                        final resolvedUrl = imageUrl(user.imagePath);
+                                        print('❌ [IMAGE_LOAD_FAILED] ${user.name}');
+                                        print('   Raw imagePath: ${user.imagePath}');
+                                        print('   Resolved URL: $resolvedUrl');
+                                        print('   Error: $error');
+                                        print('   Error Type: ${error.runtimeType}');
+                                      }
+                                    },
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -203,24 +333,46 @@ class _EventConfirmedState extends State<EventConfirmed> {
                                     ),
                                   ),
                                   GestureDetector(
-                                    onTap: () => toggleCheckIn(user.id),
+                                    onTap: (isCheckInEnabled() && _checkingInUserId != user.id) ? () => toggleCheckIn(user.id) : null,
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                       decoration: BoxDecoration(
                                         color: isUserCheckedIn(user.id)
                                             ? const Color(0xFF4A4A4A)
-                                            : const Color(0xFF9355F0),
+                                            : (isCheckInEnabled() && _checkingInUserId != user.id
+                                                ? const Color(0xFF9355F0)
+                                                : const Color(0xFF5A5A5A)),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
-                                      child: Text(
-                                        isUserCheckedIn(user.id) ? 'Checked In' : 'Check-in',
-                                        style: GoogleFonts.poppins(
-                                          color: isUserCheckedIn(user.id)
-                                              ? const Color(0xFFAEAEAE)
-                                              : Colors.white,
-                                          fontSize: isUserCheckedIn(user.id) ? 16 : 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (_checkingInUserId == user.id) ...[
+                                            const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                          ],
+                                          Text(
+                                            _checkingInUserId == user.id
+                                                ? 'Checking In...'
+                                                : (isUserCheckedIn(user.id) 
+                                                    ? 'Checked In' 
+                                                    : (isCheckInEnabled() ? 'Check-in' : 'Locked')),
+                                            style: GoogleFonts.poppins(
+                                              color: isUserCheckedIn(user.id)
+                                                  ? const Color(0xFFAEAEAE)
+                                                  : (isCheckInEnabled() && _checkingInUserId != user.id ? Colors.white : const Color(0xFF999999)),
+                                              fontSize: isUserCheckedIn(user.id) ? 16 : 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -393,7 +545,20 @@ class _EventConfirmedState extends State<EventConfirmed> {
                         children: [
                           CircleAvatar(
                             radius: 24,
-                            backgroundImage: AssetImage(user.imagePath),
+                            backgroundColor: Colors.grey[700],
+                            backgroundImage: (user.imagePath.startsWith('assets'))
+                                ? AssetImage(user.imagePath) as ImageProvider
+                                : NetworkImage(imageUrl(user.imagePath)),
+                            onBackgroundImageError: (error, stackTrace) {
+                              if (kDebugMode) {
+                                final resolvedUrl = imageUrl(user.imagePath);
+                                print('❌ [IMAGE_LOAD_FAILED] ${user.name}');
+                                print('   Raw imagePath: ${user.imagePath}');
+                                print('   Resolved URL: $resolvedUrl');
+                                print('   Error: $error');
+                                print('   Error Type: ${error.runtimeType}');
+                              }
+                            },
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -411,25 +576,6 @@ class _EventConfirmedState extends State<EventConfirmed> {
                             width: 28,
                             height: 28,
                           ),
-                          // Show "Checked In" tag if user has been checked in from eventCheckIn
-                          if (TabContentUI.isUserCheckedIn(user.id)) ...[
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2F2E2E),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                'Checked In',
-                                style: GoogleFonts.poppins(
-                                  color: const Color(0xFF6D6767),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     );

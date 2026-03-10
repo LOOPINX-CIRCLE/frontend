@@ -234,70 +234,268 @@
 //   }
 // }
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
+import 'package:text_code/core/services/invitation_service.dart';
+import 'package:text_code/core/network/api_exception.dart';
+import 'package:text_code/HostManagement/confirmedLoader.dart';
+import 'package:text_code/core/utils/image_url_helper.dart';
 
-class EventCheckIn extends StatelessWidget {
+class EventCheckIn extends StatefulWidget {
   final List<User> users;
+  final int? eventId; // Optional: if provided, fetch confirmed users from API
 
   const EventCheckIn({
     super.key,
     required this.users,
+    this.eventId,
   });
+
+  @override
+  State<EventCheckIn> createState() => _EventCheckInState();
+}
+
+class _EventCheckInState extends State<EventCheckIn> {
+  late List<User> confirmedUsers;
+  final InvitationService _invitationService = InvitationService();
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    confirmedUsers = List.from(widget.users);
+    
+    // If eventId is provided, fetch confirmed users from API
+    if (widget.eventId != null) {
+      _loadConfirmedUsers();
+    } else {
+      _isLoading = false;
+    }
+  }
+
+  Future<void> _loadConfirmedUsers() async {
+    try {
+      final attendees = await _invitationService.getEventAttendees(widget.eventId!);
+      
+      setState(() {
+        confirmedUsers = attendees.map((attendee) {
+          // If user is already checked in from API, sync with TabContentUI
+          if (attendee.isCheckedIn) {
+            TabContentUI.updateUserCheckInStatus(attendee.userId.toString(), true);
+          }
+          
+          return User(
+            id: attendee.userId.toString(),
+            name: attendee.fullName,
+            imagePath: (attendee.profilePictureUrl != null && attendee.profilePictureUrl!.isNotEmpty)
+                ? attendee.profilePictureUrl!
+                : 'assets/images/avatar.png',
+            isProcessed: attendee.isCheckedIn, // Load checked-in status from API
+            ticketSecret: attendee.ticketSecret,
+          );
+        }).toList();
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _isLoading = false;
+        // Check if it's a 400 error (Event not published)
+        if (e.statusCode == 400) {
+          _errorMessage = 'Event is not published';
+        } else if (e.statusCode == 401) {
+          _errorMessage = 'Authentication failed. Please login again.';
+        } else if (e.statusCode == 403) {
+          _errorMessage = 'You do not have permission to access this event.';
+        } else if (e.statusCode == 404) {
+          _errorMessage = 'Event not found.';
+        } else {
+          _errorMessage = e.message;
+        }
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'An unexpected error occurred';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final TextEditingController searchController = TextEditingController();
-    List<User> filteredUsers = List.from(users);
+    List<User> filteredUsers = List.from(confirmedUsers);
 
-    return StatefulBuilder(
-      builder: (context, setState) {
-        void filterUsers(String query) {
-          setState(() {
-            if (query.isEmpty) {
-              filteredUsers = List.from(users);
-            } else {
-              filteredUsers = users
-                  .where((user) =>
-                      user.name.toLowerCase().contains(query.toLowerCase()))
-                  .toList();
-            }
-          });
-        }
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF101010),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
-        void toggleCheckIn(User user) {
-          setState(() {
-            final newStatus = !user.isProcessed;
-            user.isProcessed = newStatus;
-            TabContentUI.updateUserCheckInStatus(user.id, newStatus);
-          });
-        }
-
-        return Container(
-          width: 391,
-          height: 690,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(40),
-              topRight: Radius.circular(40),
-            ),
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withOpacity(0.14),
-                width: 1,
+    // Show error state if there's an error
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF101010),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: Colors.red,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      color: Colors.red,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF9355F0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Go Back',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            gradient: const LinearGradient(
-              begin: Alignment(-0.5, -0.9),
-              end: Alignment(0.5, 0.9),
-              stops: [0.2745, 0.8516],
-              colors: [
-                Color(0xFF1B1B1B),
-                Color(0xFF1B1B1B),
-              ],
-            ),
           ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF101010),
+      body: SafeArea(
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            void filterUsers(String query) {
+              setState(() {
+                if (query.isEmpty) {
+                  filteredUsers = List.from(confirmedUsers);
+                } else {
+                  filteredUsers = confirmedUsers
+                      .where((user) =>
+                          user.name.toLowerCase().contains(query.toLowerCase()))
+                      .toList();
+                }
+              });
+            }
+
+            Future<void> toggleCheckIn(User user) async {
+          if (user.ticketSecret == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Ticket secret not available')),
+            );
+            return;
+          }
+
+          try {
+            final response = await _invitationService.checkInWithTicketSecret(
+              eventId: widget.eventId!,
+              ticketSecret: user.ticketSecret!,
+            );
+
+            if (response['success'] == true) {
+              setState(() {
+                user.isProcessed = true;
+                TabContentUI.updateUserCheckInStatus(user.id, true);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    response['already_checked_in'] == true
+                        ? '${user.name} was already checked in'
+                        : '${user.name} checked in successfully',
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } on ApiException catch (e) {
+            // Show appropriate error message based on status code
+            String errorMessage = 'Check-in failed';
+            if (e.statusCode == 400) {
+              errorMessage = 'Event is not published';
+            } else if (e.statusCode == 401) {
+              errorMessage = 'Authentication failed';
+            } else if (e.statusCode == 403) {
+              errorMessage = 'You do not have permission';
+            } else if (e.statusCode == 404) {
+              errorMessage = 'Event or ticket not found';
+            } else {
+              errorMessage = e.message;
+            }
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Check-in failed: $e'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             children: [
               Text(
@@ -310,168 +508,255 @@ class EventCheckIn extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Search Bar
-              Container(
-                width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF171717),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 1,
+              // If no confirmed users, show empty state
+              if (confirmedUsers.isEmpty)
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/icons/Check in empty state.png',
+                        width: 100,
+                        height: 100,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Check-in starts 3hr\nbefore the event',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Guests who check in at your event will appear here.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      GestureDetector(
+                        onTap: () {
+                          // Navigate to Confirmed guests page
+                          Navigator.pop(context);
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            if (mounted) {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => ConfirmedLoader(
+                                  eventId: widget.eventId ?? 0,
+                                  isCheckInMode: false,
+                                ),
+                              );
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 40,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF9355F0),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'View Guest List',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                child: TextField(
-                  controller: searchController,
-                  onChanged: filterUsers,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name, code',
-                    hintStyle: GoogleFonts.poppins(
-                      color: Colors.grey.withOpacity(0.5),
-                      fontSize: 14,
+                )
+              else ...[
+                // Search Bar
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF171717),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
                     ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Text(
-                    'Guests',
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: filterUsers,
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, code',
+                      hintStyle: GoogleFonts.poppins(
+                        color: Colors.grey.withOpacity(0.5),
+                        fontSize: 14,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                ],
-              ),
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-              // USER LIST
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredUsers.length,
-                  itemBuilder: (context, index) {
-                    final user = filteredUsers[index];
-                    final secretCode = '${1000 + index}${1000 + index}';
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      'List of guest to check in',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                const SizedBox(height: 16),
+
+                // USER LIST - Use Expanded with ListView inside to fill available space
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: filteredUsers.length,
+                    itemBuilder: (context, index) {
+                      final user = filteredUsers[index];
+                      final secretCode = user.ticketSecret ?? '${1000 + index}${1000 + index}';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B1B1B),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CircleAvatar(
-                                radius: 24,
-                                backgroundImage: AssetImage(user.imagePath),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  user.name,
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w400,
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 24,
+                                    backgroundColor: Colors.grey[700],
+                                    backgroundImage: (user.imagePath.startsWith('assets'))
+                                        ? AssetImage(user.imagePath) as ImageProvider
+                                        : NetworkImage(imageUrl(user.imagePath)),
+                                    onBackgroundImageError: (error, stackTrace) {
+                                      if (kDebugMode) {
+                                        final resolvedUrl = imageUrl(user.imagePath);
+                                        print('❌ [IMAGE_LOAD_FAILED] ${user.name}');
+                                        print('   Raw imagePath: ${user.imagePath}');
+                                        print('   Resolved URL: $resolvedUrl');
+                                        print('   Error: $error');
+                                        print('   Error Type: ${error.runtimeType}');
+                                      }
+                                    },
                                   ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => toggleCheckIn(user),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 24, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: user.isProcessed
-                                        ? const Color(0xFF4A4A4A)
-                                        : const Color(0xFF9355F0),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    user.isProcessed
-                                        ? 'Checked In'
-                                        : 'Check-In',
-                                    style: GoogleFonts.poppins(
-                                      color: user.isProcessed
-                                          ? const Color(0xFFAEAEAE)
-                                          : Colors.white,
-                                      fontSize: user.isProcessed ? 16 : 14,
-                                      fontWeight: FontWeight.w500,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      user.name,
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w400,
+                                      ),
                                     ),
                                   ),
-                                ),
+                                  GestureDetector(
+                                    onTap: () => toggleCheckIn(user),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: user.isProcessed
+                                            ? const Color(0xFF4A4A4A)
+                                            : const Color(0xFF9355F0),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        user.isProcessed
+                                            ? 'Checked In'
+                                            : 'Check-In',
+                                        style: GoogleFonts.poppins(
+                                          color: user.isProcessed
+                                              ? const Color(0xFFAEAEAE)
+                                              : Colors.white,
+                                          fontSize: user.isProcessed ? 16 : 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              // SECRET CODE UNDER CHECK-IN BUTTON
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Secret code',
+                                    style: GoogleFonts.poppins(
+                                      color: const Color(0xFFAEAEAE),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w300,
+                                    ),
+                                  ),
+                                  Text(
+                                    secretCode,
+                                    style: GoogleFonts.poppins(
+                                      color: const Color(0xFFAEAEAE),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-
-                          const SizedBox(height: 6),
-
-                          // SECRET CODE UNDER CHECK-IN BUTTON
-                          SizedBox(
-                            width: double.infinity,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Secret code:',
-                                  style: GoogleFonts.poppins(
-                                    color: const Color(0xFFAEAEAE),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w300,
-                                  ),
-                                ),
-
-                                const SizedBox(width: 20),
-                                Text(
-                                  secretCode,
-                                  style: GoogleFonts.poppins(
-                                    color: const Color(0xFFAEAEAE),
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9355F0),
-                    borderRadius: BorderRadius.circular(20),
+                        ),
+                      );
+                    },
                   ),
-                  child: Center(
+                ),
+              ],
+
+              Center(
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF9355F0),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
                     child: Text(
-                      'Done',
+                      confirmedUsers.isEmpty ? 'Back' : 'Done',
                       style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -484,6 +769,8 @@ class EventCheckIn extends StatelessWidget {
           ),
         );
       },
+        ),
+      ),
     );
   }
 }

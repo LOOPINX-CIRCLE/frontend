@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:text_code/core/services/payout_service.dart';
 import 'bank_submit_success.dart';
 
 class BankFormScreen extends StatefulWidget {
@@ -25,6 +26,9 @@ class _BankFormScreenState extends State<BankFormScreen> {
   final FocusNode _ifscFocus = FocusNode();
   final FocusNode _confirmAccountNumberFocus = FocusNode();
   final FocusNode _accountHolderNameFocus = FocusNode();
+  final PayoutService _payoutService = PayoutService();
+  
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -54,6 +58,55 @@ class _BankFormScreenState extends State<BankFormScreen> {
         _confirmAccountNumberController.text.trim().isNotEmpty &&
         _accountHolderNameController.text.trim().isNotEmpty &&
         _isAccountNumberMatching;
+  }
+
+  /// Submit bank account details and create bank account via API
+  Future<void> _submitBankAccount() async {
+    if (!_isFormValid) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await _payoutService.createBankAccount(
+        bankName: widget.bankName,
+        accountNumber: _accountNumberController.text.trim(),
+        ifscCode: _ifscController.text.trim(),
+        accountHolderName: _accountHolderNameController.text.trim(),
+        isPrimary: false,
+      );
+
+      if (response['success'] == true) {
+        // Navigate to success screen
+        if (mounted) {
+          Navigator.pop(context);
+          BankSubmitSuccessScreen.show(context);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e.toString().replaceAll('Exception: ', ''),
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -454,33 +507,38 @@ class _BankFormScreenState extends State<BankFormScreen> {
               padding: const EdgeInsets.only(bottom: 20),
               child: Center(
                 child: GestureDetector(
-                  onTap: _isFormValid
-                      ? () {
-                          // Navigate to success screen
-                          Navigator.pop(context);
-                          BankSubmitSuccessScreen.show(context);
-                        }
+                  onTap: (_isFormValid && !_isLoading)
+                      ? () => _submitBankAccount()
                       : null,
                   child: Container(
                     width: _isBasicFormFilled ? 269 : 157,
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                     decoration: BoxDecoration(
-                      color: _isFormValid
+                      color: (_isFormValid && !_isLoading)
                           ? const Color(0xFF9355F0)
                           : const Color(0xFF2F2E2E),
                       borderRadius: BorderRadius.circular(50),
                     ),
                     child: Center(
-                      child: Text(
-                        _isBasicFormFilled ? 'Proceed to submit' : 'Next',
-                        style: GoogleFonts.poppins(
-                          color: _isFormValid
-                              ? Colors.white
-                              : const Color(0xFF6D6767),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              _isBasicFormFilled ? 'Proceed to submit' : 'Next',
+                              style: GoogleFonts.poppins(
+                                color: (_isFormValid && !_isLoading)
+                                    ? Colors.white
+                                    : const Color(0xFF6D6767),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                     ),
                   ),
                 ),

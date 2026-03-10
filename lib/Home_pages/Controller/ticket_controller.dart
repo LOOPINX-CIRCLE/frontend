@@ -9,6 +9,7 @@ class UserTicket {
   final String eventImage;
   final String? invites;
   final String? buttonImage;
+  final int? eventId; // Add eventId for share functionality
 
   UserTicket({
     required this.title,
@@ -19,6 +20,7 @@ class UserTicket {
     required this.eventImage,
     this.invites,
     this.buttonImage,
+    this.eventId,
   });
 }
 

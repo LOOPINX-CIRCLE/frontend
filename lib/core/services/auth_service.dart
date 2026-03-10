@@ -103,7 +103,7 @@ class AuthService {
 
       // Check if verification was successful and token exists
       if (response['success'] == true && response['token'] != null) {
-        final token = response['token'] as String;
+        final token = (response['token'] as String).trim(); // ✅ Trim whitespace
         // Store token securely
         await _secureStorage.saveToken(token);
 
@@ -271,13 +271,13 @@ class AuthService {
       }
 
       // Prepare fields
-      // For FastAPI multipart forms, arrays are sent as JSON strings
+      // For FastAPI multipart forms, arrays should be sent as JSON string without double-encoding
       final fields = <String, String>{
         'phone_number': phoneNumber,
         'name': name,
         'birth_date': birthDate,
         'gender': gender,
-        'event_interests': jsonEncode(eventInterests), // Send as JSON array string
+        'event_interests': '[${eventInterests.join(',')}]', // Send as valid JSON array string: [1,2]
       };
 
       // Prepare multipart files from bytes
@@ -497,11 +497,16 @@ class AuthService {
   /// Get stored token (for external use if needed)
   Future<String?> getStoredToken() async {
     final token = await _secureStorage.getToken();
+    // ✅ Trim whitespace to ensure clean token
+    final cleanToken = token != null ? token.trim() : null;
     if (kDebugMode) {
-      print('JWT Token: '
-          '${token ?? "(null)"}');
+      if (cleanToken != null) {
+        print('JWT Token retrieved: ${cleanToken.substring(0, 20)}... (length: ${cleanToken.length})');
+      } else {
+        print('JWT Token: (null)');
+      }
     }
-    return token;
+    return cleanToken;
   }
 
   /// Clear stored token (logout)

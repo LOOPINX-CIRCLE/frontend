@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
 
 class RequestsEmpty {
-  static Future<void> show(BuildContext context, {String? eventName, String? eventPrice, int? confirmedUsers, int? requestsCount}) {
+  static Future<void> show(BuildContext context, {String? eventName, String? eventPrice, int? confirmedUsers, int? requestsCount, int? eventId}) {
     final count = requestsCount ?? 0;
     
     return showModalBottomSheet(
@@ -15,6 +15,7 @@ class RequestsEmpty {
         eventName: eventName,
         eventPrice: eventPrice,
         confirmedUsers: confirmedUsers,
+        eventId: eventId,
           ),
     ).then((_) {});
   }

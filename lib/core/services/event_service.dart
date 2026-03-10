@@ -169,7 +169,7 @@ class EventService {
       return eventsList
           .map((json) => Event.fromJson(json as Map<String, dynamic>))
           .toList();
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
@@ -177,6 +177,108 @@ class EventService {
       }
       throw ApiException(
         message: 'An error occurred while fetching events: ${error.toString()}',
+        error: error,
+      );
+    }
+  }
+
+  /// Update RSVP deadline for an event
+  /// Maps friendly names to API values:
+  /// "48 Hours" -> "48h"
+  /// "7 Days" -> "7d"
+  /// "Before Event Day" -> "day_before_event"
+  /// "At Event Start" -> "event_start"
+  Future<Map<String, dynamic>> updateRsvpDeadline({
+    required int eventId,
+    required String rsvpOption,
+  }) async {
+    try {
+      final token = await _secureStorage.getToken();
+
+      if (token == null || token.isEmpty) {
+        throw ApiException(
+          message: 'Authentication required.',
+          statusCode: 401,
+          error: 'No token found',
+        );
+      }
+
+      // Map friendly names to API values
+      final Map<String, String> rsvpMapping = {
+        '48 Hours': '48h',
+        '7 Days': '7d',
+        'Before Event Day': 'day_before_event',
+        'At Event Start': 'event_start',
+      };
+
+      final expiryPolicy = rsvpMapping[rsvpOption] ?? '48h';
+
+      if (kDebugMode) {
+        print('\n========== RSVP UPDATE DEBUG ==========');
+        print('📝 Updating RSVP deadline for event $eventId');
+        print('   User Selected: "$rsvpOption"');
+        print('   Mapping Keys: ${rsvpMapping.keys.toList()}');
+        print('   Mapping Match: ${rsvpMapping.containsKey(rsvpOption)}');
+        print('   API Value: "$expiryPolicy"');
+        print('   Token: ${token.substring(0, 20)}...');
+      }
+
+      final requestBody = {
+        'rsvp_expiry_policy': expiryPolicy,
+      };
+
+      if (kDebugMode) {
+        print('   Request Body: $requestBody');
+        print('   Endpoint: /events/$eventId');
+      }
+
+      final response = await _apiClient.put(
+        '/events/$eventId',
+        body: requestBody,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (kDebugMode) {
+        print('✅ RSVP update response status: ${response.toString().split('\n')[0]}');
+        print('📥 Full response: $response');
+        print('========== END DEBUG ==========\n');
+      }
+
+      if (response.containsKey('success') && response['success'] == true) {
+        return {
+          'success': true,
+          'message': 'RSVP deadline updated successfully',
+          'data': response,
+        };
+      } else if (response.containsKey('detail')) {
+        throw ApiException(
+          message: response['detail'] is String 
+              ? response['detail'] 
+              : 'Failed to update RSVP deadline',
+          statusCode: 400,
+          error: response,
+        );
+      } else {
+        return {
+          'success': true,
+          'message': 'RSVP deadline updated successfully',
+          'data': response,
+        };
+      }
+    } on ApiException catch (e) {
+      if (kDebugMode) {
+        print('❌ RSVP update error: ${e.message}');
+      }
+      rethrow;
+    } catch (error) {
+      if (kDebugMode) {
+        print('💥 Error updating RSVP: $error');
+      }
+      throw ApiException(
+        message: 'An error occurred while updating RSVP deadline: ${error.toString()}',
         error: error,
       );
     }

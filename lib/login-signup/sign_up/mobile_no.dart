@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:country_picker/country_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:text_code/login-signup/sign_up/otp_page.dart';
@@ -8,6 +10,7 @@ import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/login-signup/Controller/user_controller.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MobileNo extends StatefulWidget {
   const MobileNo({super.key});
@@ -331,10 +334,11 @@ class _MobileNoState extends State<MobileNo> {
                               ),
                           
                               const SizedBox(height: 9),
-                              const Text.rich(
-                                TextSpan(
+                              RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
                                   children: [
-                                    TextSpan(
+                                    const TextSpan(
                                       text: "By tapping Continue, you are agreeing to\n our ",
                                       style: TextStyle(
                                         fontFamily: 'BricolageGrotesque',
@@ -343,13 +347,23 @@ class _MobileNoState extends State<MobileNo> {
                                       ),
                                     ),
                                     TextSpan(
-                                      text: " Terms of Service",
-                                      style: TextStyle(
+                                      text: "Terms of Service",
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         color: Color(0xffD7D7D7),
                                       ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () async {
+                                          try {
+                                            await launchUrl(Uri.parse('https://loopinsocial.in/terms-and-conditions'));
+                                          } catch (e) {
+                                            if (kDebugMode) {
+                                              print('Could not launch Terms URL: $e');
+                                            }
+                                          }
+                                        },
                                     ),
-                                    TextSpan(
+                                    const TextSpan(
                                       text: " and ",
                                       style: TextStyle(
                                         fontSize: 10,
@@ -358,14 +372,23 @@ class _MobileNoState extends State<MobileNo> {
                                     ),
                                     TextSpan(
                                       text: "Privacy Policy",
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         color: Color(0xffD7D7D7),
                                       ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () async {
+                                          try {
+                                            await launchUrl(Uri.parse('https://loopinsocial.in/privacy-policy'));
+                                          } catch (e) {
+                                            if (kDebugMode) {
+                                              print('Could not launch Privacy Policy URL: $e');
+                                            }
+                                          }
+                                        },
                                     ),
                                   ],
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 12),
                             ],

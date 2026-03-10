@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
+import 'package:text_code/core/services/event_request_service.dart';
 
 
 class Invite extends StatefulWidget {
-  const Invite({super.key});
+  final int eventId;
+  
+  const Invite({super.key, this.eventId = 0});
 
   @override
   State<Invite> createState() => _InviteState();
@@ -27,8 +31,42 @@ class _InviteState extends State<Invite> {
   ];
 
   String searchQuery = "";
+  String _shareUrl = ""; // Real share URL from backend
   
   Set<String> selectedContacts = {};
+
+  late EventRequestService _eventRequestService;
+
+  @override
+  void initState() {
+    super.initState();
+    _eventRequestService = EventRequestService();
+    
+    // Fetch the share URL if eventId is provided
+    if (widget.eventId > 0) {
+      _fetchShareUrl();
+    }
+  }
+
+  Future<void> _fetchShareUrl() async {
+    try {
+      final url = await _eventRequestService.getEventShareUrl(widget.eventId);
+      
+      if (mounted) {
+        setState(() {
+          _shareUrl = url;
+        });
+      }
+      
+      if (kDebugMode) {
+        print('✅ Share URL loaded: $_shareUrl');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error fetching share URL: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,9 +180,21 @@ class _InviteState extends State<Invite> {
                     // 🔹 Right side Share Invite button
                     GestureDetector(
                       onTap: () async {
+                        if (_shareUrl.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Loading share URL...'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          return;
+                        }
+                        
+                        final shareMessage = 'Check out this awesome event! 🎉\nJoin here 👉 $_shareUrl';
+                        
                         SharePlus.instance.share(
                           ShareParams(
-                            text: 'check out my website https://example.com',
+                            text: shareMessage,
                           ),
                         );
                       },
@@ -385,7 +435,7 @@ class _InviteState extends State<Invite> {
               if (selectedContacts.isNotEmpty)
                 GestureDetector(
                   onTap: () {
-                    debugPrint("Invite sent to $selectedContacts");
+                    // Invite action would be handled here
                   },
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 10),

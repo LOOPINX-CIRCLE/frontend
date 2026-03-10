@@ -6,13 +6,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.text_code"
+    namespace = "com.example.flutter_application_1"
 
     compileSdk = 35 // you can keep flutter.compileSdkVersion if dynamic
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "com.example.text_code"
+        applicationId = "com.example.flutter_application_1"
         minSdk = 23 
         targetSdk = 35
         versionCode = flutter.versionCode
@@ -47,4 +47,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("com.onesignal:OneSignal:[5, 6)")
 }

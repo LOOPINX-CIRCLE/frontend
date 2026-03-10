@@ -10,6 +10,7 @@ class MainScreenContent extends StatelessWidget {
   final int invitedCount;
   final int requestsCount;
   final int checkInCount;
+  final DateTime? eventDateTime; // For check-in time validation (3 hours before)
   final VoidCallback? onBackPressed;
   final VoidCallback? onInvitedTap;
   final VoidCallback? onRequestsTap;
@@ -29,6 +30,7 @@ class MainScreenContent extends StatelessWidget {
     this.invitedCount = 0,
     this.requestsCount = 0,
     this.checkInCount = 0,
+    this.eventDateTime,
     this.onBackPressed,
     this.onInvitedTap,
     this.onRequestsTap,
@@ -40,6 +42,19 @@ class MainScreenContent extends StatelessWidget {
     this.onSentInvitesTap,
     this.selectedRsvpOption,
   });
+
+  /// Check if check-in is allowed (3 hours before event or after)
+  bool _isCheckInAllowed() {
+    if (eventDateTime == null) {
+      return false; // No event time specified, don't allow check-in
+    }
+
+    final now = DateTime.now();
+    final threeHoursBefore = eventDateTime!.subtract(const Duration(hours: 3));
+    
+    // Check-in is allowed from 3 hours before event until now (and after event)
+    return now.isAfter(threeHoursBefore);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,24 +234,25 @@ class MainScreenContent extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     // Start check-in button
-                    GestureDetector(
-                      onTap: selectedRsvpOption == '48 Hours' ? onStartCheckInTap : null,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 57, vertical: 16),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          color: selectedRsvpOption == '48 Hours'
-                              ? const Color(0xFF9355F0) // Active when 48 Hours selected
-                              : const Color(0xFF2F2E2E), // Inactive
-                        ),
-                        child: Text(
-                          'Start check-in',
-                          style: GoogleFonts.poppins(
-                            color: selectedRsvpOption == '48 Hours'
-                                ? Colors.white // White text when active
-                                : const Color(0xFF6D6767), // Gray text when inactive
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
+                    Opacity(
+                      opacity: _isCheckInAllowed() ? 1.0 : 0.5,
+                      child: GestureDetector(
+                        onTap: _isCheckInAllowed() ? onStartCheckInTap : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 57, vertical: 16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            color: _isCheckInAllowed() 
+                              ? const Color(0xFF9355F0) // Purple when enabled
+                              : Colors.grey, // Gray when disabled
+                          ),
+                          child: Text(
+                            'Start check-in',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
@@ -247,25 +263,30 @@ class MainScreenContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18), // Gap from gradient box
-            // Two buttons row
+            // Three buttons row
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: _buildActionButton(
-                      context,
-                      text: 'Edit RSVP deadline',
-                      onTap: onEditRsvpTap,
-                    ),
-                  ),
-                  const SizedBox(width: 15), // Gap between buttons
-                  Expanded(
-                    child: _buildActionButton(
-                      context,
-                      text: 'Event Analytics',
-                      onTap: onEventAnalyticsTap,
-                    ),
+                  // First row - Edit RSVP and Event Analytics
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionButton(
+                          context,
+                          text: 'Edit RSVP deadline',
+                          onTap: onEditRsvpTap,
+                        ),
+                      ),
+                      const SizedBox(width: 15), // Gap between buttons
+                      Expanded(
+                        child: _buildActionButton(
+                          context,
+                          text: 'Event Analytics',
+                          onTap: onEventAnalyticsTap,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -9,6 +9,7 @@ class InvitedEmpty {
     int? confirmedUsers,
     int? invitedCount,
     VoidCallback? onUsersInvited,
+    int? eventId,
   }) {
     final count = invitedCount ?? 0;
 
@@ -23,6 +24,7 @@ class InvitedEmpty {
         eventPrice: eventPrice,
         confirmedUsers: confirmedUsers,
         onUsersInvited: onUsersInvited,
+        eventId: eventId,
       ),
     ).then((_) {});
     }
