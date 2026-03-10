@@ -11,7 +11,7 @@ import 'package:text_code/Reusable/guest_empty_state_sheet.dart';
 import 'package:text_code/Reusable/main_screen_content.dart';
 import 'package:text_code/HostManagement/sentInvitesScreen.dart';
 import 'package:text_code/Reusable/tab_content_ui.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/services/invitation_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
 

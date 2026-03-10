@@ -20,7 +20,7 @@ import 'package:text_code/Home_pages/UI_Design/eventdetail.dart';
 import 'package:text_code/HostManagement/mainScreen.dart';
 import 'package:text_code/core/utils/jwt_utils.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/utils/image_url_helper.dart';
 
 class HomePages extends StatefulWidget {
