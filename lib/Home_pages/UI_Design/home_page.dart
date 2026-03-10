@@ -771,12 +771,7 @@ class _HomePagesState extends State<HomePages> {
                           ? ''
                           : 'assets/images/button/Frame 19976 (4).png',
                       buttonLabel: (() {
-                        // Button logic is purely based on API request status, not widget title
-                        // API: GET /api/events/{event_id}/my-request
-                        // Status: "pending" -> "Requested to join"
-                        // Status: "accepted" -> Two buttons (Going!/Not Going) - buttonLabel should be null
-                        // 404 (null) -> "Send Request"
-                        
+                       
                         if (isEnded) {
                           if (kDebugMode) {
                             print('  [Button Label] Event ended - returning null');
