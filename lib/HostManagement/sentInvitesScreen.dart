@@ -492,12 +492,14 @@ class SearchUserDisplay {
   final int id;
   final String fullName;
   final String? profilePictureUrl;
+  final bool alreadyInvited;
   bool isSelected;
 
   SearchUserDisplay({
     required this.id,
     required this.fullName,
     this.profilePictureUrl,
+    this.alreadyInvited = false,
     this.isSelected = false,
   });
 }
@@ -565,16 +567,31 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
 
   Future<void> _searchUsers(String query) async {
     try {
+      if (widget.eventId == null) {
+        if (kDebugMode) {
+          print('❌ [SentInvitesScreen._searchUsers] eventId is required');
+        }
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error: Event ID is required'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       setState(() => _isLoading = true);
       
       if (kDebugMode) {
-        print('🔍 [SentInvitesScreen._searchUsers] Starting search');
+        print('🔍 [SentInvitesScreen._searchUsers] Searching for: "$query"');
         print('   eventId: ${widget.eventId}');
-        print('   query: "$query"');
       }
       
       final response = await _invitationService.searchUsers(
-        eventId: widget.eventId ?? 0,
+        eventId: widget.eventId!,
         search: query.isEmpty ? null : query,
         offset: 0,
         limit: 100,
@@ -588,22 +605,31 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
 
       if (mounted) {
         setState(() {
+          // Create SearchUserDisplay list from response
           _users = response.data.map((user) {
             if (kDebugMode) {
               print('[SentInvitesScreen] User: ${user.fullName} (id: ${user.id}, already_invited: ${user.alreadyInvited})');
-              print('  Raw profilePictureUrl: ${user.profilePictureUrl}');
-              print('  Resolved imageUrl: ${imageUrl(user.profilePictureUrl ?? '')}');
             }
             return SearchUserDisplay(
               id: user.id,
               fullName: user.fullName,
               profilePictureUrl: user.profilePictureUrl,
+              alreadyInvited: user.alreadyInvited,
             );
           }).toList();
+          
+          // Sort: users not yet invited first, then already invited users
+          _users.sort((a, b) {
+            if (a.alreadyInvited == b.alreadyInvited) return 0;
+            return a.alreadyInvited ? 1 : -1;  // false (not invited) comes first
+          });
+          
           _filteredUsers = List.from(_users);
           _isLoading = false;
           if (kDebugMode) {
             print('✅ [SentInvitesScreen._searchUsers] Updated state with ${_users.length} users');
+            print('   Not yet invited: ${_users.where((u) => !u.alreadyInvited).length}');
+            print('   Already invited: ${_users.where((u) => u.alreadyInvited).length}');
           }
         });
       }
@@ -614,6 +640,24 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
       }
       if (mounted) {
         setState(() => _isLoading = false);
+        
+        // Handle EVENT_NOT_PUBLISHED error specially
+        String errorMessage = 'Search failed';
+        if (e.toString().contains('EVENT_NOT_PUBLISHED')) {
+          errorMessage = '⚠️ Event must be published before you can send invitations';
+        } else if (e.toString().contains('400')) {
+          errorMessage = 'Event must be published to perform this action';
+        } else {
+          errorMessage = 'Search failed: ${e.toString()}';
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     }
   }
@@ -643,15 +687,25 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
     setState(() {
       _selectAll = !_selectAll;
       for (var user in _filteredUsers) {
-        user.isSelected = _selectAll;
+        // Don't select already invited users
+        if (!user.alreadyInvited) {
+          user.isSelected = _selectAll;
+        }
       }
     });
   }
 
   void _toggleUserSelection(SearchUserDisplay user) {
+    // Don't allow selecting already invited users
+    if (user.alreadyInvited) {
+      return;
+    }
+    
     setState(() {
       user.isSelected = !user.isSelected;
-      _selectAll = _filteredUsers.every((u) => u.isSelected);
+      // Check if all non-invited users are selected
+      final nonInvitedUsers = _filteredUsers.where((u) => !u.alreadyInvited).toList();
+      _selectAll = nonInvitedUsers.isNotEmpty && nonInvitedUsers.every((u) => u.isSelected);
     });
   }
 
@@ -915,24 +969,40 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                user.fullName,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w400,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user.fullName,
+                                    style: GoogleFonts.poppins(
+                                      color: user.alreadyInvited ? Colors.grey[400] : Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w400,
+                                    ),
+                                  ),
+                                  if (user.alreadyInvited)
+                                    Text(
+                                      'Already invited',
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.grey[600],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w300,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => _toggleUserSelection(user),
+                              onTap: user.alreadyInvited ? null : () => _toggleUserSelection(user),
                               child: Container(
                                 padding: EdgeInsets.symmetric(
                                   horizontal: user.isSelected ? 16 : 24,
                                   vertical: user.isSelected ? 6 : 10,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: user.isSelected
+                                  color: user.alreadyInvited
+                                      ? Colors.grey[700]
+                                      : user.isSelected
                                       ? const Color(0xFF4A4A4A)
                                       : const Color(0xFF9355F0),
                                   borderRadius: BorderRadius.circular(
@@ -940,9 +1010,13 @@ class _SentInvitesScreenState extends State<SentInvitesScreen> {
                                   ),
                                 ),
                                 child: Text(
-                                  user.isSelected ? 'Selected' : 'Invite',
+                                  user.alreadyInvited
+                                      ? 'Invited'
+                                      : user.isSelected ? 'Selected' : 'Invite',
                                   style: GoogleFonts.poppins(
-                                    color: user.isSelected
+                                    color: user.alreadyInvited
+                                        ? Colors.grey[600]
+                                        : user.isSelected
                                         ? const Color(0xFFAEAEAE)
                                         : Colors.white,
                                     fontSize: user.isSelected ? 16 : 14,

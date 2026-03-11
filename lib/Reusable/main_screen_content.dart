@@ -43,7 +43,7 @@ class MainScreenContent extends StatelessWidget {
     this.selectedRsvpOption,
   });
 
-  /// Check if check-in is allowed (3 hours before event or after)
+  /// Check if check-in is allowed (3 hours before event start time, NOT after)
   bool _isCheckInAllowed() {
     if (eventDateTime == null) {
       return false; // No event time specified, don't allow check-in
@@ -52,8 +52,9 @@ class MainScreenContent extends StatelessWidget {
     final now = DateTime.now();
     final threeHoursBefore = eventDateTime!.subtract(const Duration(hours: 3));
     
-    // Check-in is allowed from 3 hours before event until now (and after event)
-    return now.isAfter(threeHoursBefore);
+    // Check-in is ONLY allowed from 3 hours before event until event start time
+    // Once event starts, check-in is disabled
+    return now.isAfter(threeHoursBefore) && now.isBefore(eventDateTime!);
   }
 
   @override

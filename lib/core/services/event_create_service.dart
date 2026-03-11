@@ -1,12 +1,9 @@
-import 'dart:convert';
-
+﻿import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:flutter/foundation.dart';
 import 'package:text_code/core/services/auth_service.dart';
-import 'package:text_code/core/utils/jwt_utils.dart';
 import 'package:text_code/core/network/api_client.dart';
-import 'package:text_code/core/constants/api_constants.dart';
 
 class EventCreateService {
   final ApiClient _apiClient;
@@ -42,40 +39,27 @@ class EventCreateService {
     required List<dynamic> coverImages, // File for mobile, Map<String, dynamic> for web
   }) async {
     if (kDebugMode) {
-      print('🚀 Creating event with title: $title');
-      print('🏢 Venue: $venueName');
-      print('📍 Location: $locationCity, $locationAddress');
-      print('🕐 Start: $startTime, Duration: ${durationHours}h');
-      print('👥 Capacity: $maxCapacity, Paid: $isPaid, Price: $ticketPrice');
-      print('� Platform Fee (10%): $platformFee');
-      print('�🖼️ Cover images: ${coverImages.length}');
-      print('🌍 Country: $locationCountryCode, PlaceID: $locationPlaceId');
     }
 
     final authService = AuthService();
     final token = await authService.getStoredToken();
     if (token == null || token.isEmpty) {
       if (kDebugMode) {
-        print('❌ No auth token found');
       }
       throw Exception('Authentication required. Please login first.');
     }
 
-    // ✅ Trim whitespace and validate token
+    // âœ… Trim whitespace and validate token
     final cleanToken = token.trim();
     if (cleanToken.isEmpty || !cleanToken.contains('.')) {
       if (kDebugMode) {
-        print('❌ Invalid token format: token is empty or missing JWT parts');
       }
       throw Exception('Invalid token format. Please login again.');
     }
 
     if (kDebugMode) {
-      print('🔑 Token length: ${cleanToken.length}');
-      print('🔑 Token parts: ${cleanToken.split('.').length}'); // Should be 3 (header.payload.signature)
-      print('🔑 Using auth token: ${cleanToken.substring(0, 20)}...');
       
-      // ✅ Decode JWT to check payload
+      // âœ… Decode JWT to check payload
       try {
         final parts = cleanToken.split('.');
         if (parts.length == 3) {
@@ -88,30 +72,22 @@ class EventCreateService {
           final decoded = utf8.decode(base64.decode(padded));
           final payloadJson = json.decode(decoded);
           
-          print('🔐 Token Payload (decoded):');
           payloadJson.forEach((key, value) {
             if (key == 'exp') {
               final expTime = DateTime.fromMillisecondsSinceEpoch(value * 1000);
               final now = DateTime.now();
-              print('   ⏰ $key: $value (expires: ${expTime.toIso8601String()})');
-              print('      Current time: ${now.toIso8601String()}');
-              print('      Expired: ${now.isAfter(expTime) ? 'YES ❌' : 'NO ✅'}');
             } else if (key == 'iat') {
               final iatTime = DateTime.fromMillisecondsSinceEpoch(value * 1000);
-              print('   ℹ️ $key: $value (issued: ${iatTime.toIso8601String()})');
             } else {
-              print('   📋 $key: $value');
             }
           });
         }
       } catch (e) {
-        print('⚠️ Could not decode JWT payload: $e');
       }
     }
 
-    // ✅ TEST: Verify token works with the same endpoint that fetches profile
+    // âœ… TEST: Verify token works with the same endpoint that fetches profile
     if (kDebugMode) {
-      print('🧪 Testing token with ApiClient.get(/auth/profile)...');
       try {
         final testResponse = await _apiClient.get(
           '/auth/profile',
@@ -120,14 +96,11 @@ class EventCreateService {
           },
         );
         
-        print('✅ TOKEN IS VALID - ApiClient can authenticate!');
-        print('   Profile data received: ${testResponse['phone_number'] ?? 'N/A'}');
       } catch (e) {
-        print('❌ TOKEN VALIDATION FAILED: $e');
       }
     }
 
-    // ✅ Build fields map for multipart request
+    // âœ… Build fields map for multipart request
     final fields = <String, String>{
       'title': title,
       'description': description,
@@ -153,13 +126,11 @@ class EventCreateService {
     };
 
     if (kDebugMode) {
-      print('📤 Request fields being sent:');
       fields.forEach((key, value) {
-        print('   $key: $value');
       });
     }
 
-    // ✅ Build files list
+    // âœ… Build files list
     final files = <http.MultipartFile>[];
     if (coverImages.isNotEmpty) {
       for (int i = 0; i < coverImages.length && i < 3; i++) {
@@ -199,15 +170,13 @@ class EventCreateService {
       }
     }
 
-    // ✅ USE APICLIENT.POSTMULTIPART (Same one that works for profile auth)
+    // âœ… USE APICLIENT.POSTMULTIPART (Same one that works for profile auth)
     if (kDebugMode) {
-      print('📤 Using ApiClient.postMultipart (/events endpoint)...');
-      print('📤 Files to upload: ${files.length}');
     }
 
     try {
       final response = await _apiClient.postMultipart(
-        '/events',
+        '/api/events',
         fields: fields,
         files: files,
         headers: {
@@ -216,13 +185,10 @@ class EventCreateService {
       );
 
       if (kDebugMode) {
-        print('✅ Event created successfully!');
-        print('Response: ${json.encode(response)}');
       }
       return response;
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Event creation failed: $e');
       }
       rethrow;
     }

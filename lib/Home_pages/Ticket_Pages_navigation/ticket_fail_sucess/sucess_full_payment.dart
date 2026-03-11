@@ -8,7 +8,7 @@ import 'package:text_code/login-signup/sign_up/booked_ticket.dart';
 import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
 import 'package:text_code/Home_pages/Controller/home_page.dart';
 import 'package:text_code/Home_pages/UI_Design/home_with_tabs.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/network/api_exception.dart';
 
 class SucessFullPayment extends StatefulWidget {

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
@@ -27,17 +27,12 @@ class OneSignalHandler {
       _notificationTapHandler = onNotificationTap;
 
       if (kDebugMode) {
-        print('🔔 Initializing OneSignal');
-        print('   App ID: $appId');
-        print('   Platform: ${Platform.isIOS ? 'iOS' : 'Android'}');
       }
 
       // Initialize OneSignal with App ID
       OneSignal.initialize(appId);
       
       if (kDebugMode) {
-        print('   ✅ OneSignal.initialize() called');
-        print('   Waiting for OneSignal to initialize...');
       }
       
       // Request notification permissions
@@ -45,7 +40,6 @@ class OneSignalHandler {
 
       // Give OneSignal time to initialize subscription
       if (kDebugMode) {
-        print('   Waiting for subscription to be ready...');
       }
       await Future.delayed(const Duration(milliseconds: 2000));
 
@@ -54,12 +48,7 @@ class OneSignalHandler {
       _playerIdCache = playerId;
 
       if (kDebugMode) {
-        print('✅ OneSignal initialized');
-        print('   Player ID: $_playerIdCache');
         if (_playerIdCache == null) {
-          print('⚠️ DIAGNOSTIC INFO:');
-          print('   OneSignal App ID was set: ${_oneSignalAppId != null}');
-          print('   Notification permission was requested');
           _printDiagnostics();
         }
       }
@@ -69,7 +58,6 @@ class OneSignalHandler {
       return _playerIdCache;
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Failed to initialize OneSignal: $e');
       }
       return null;
     }
@@ -79,21 +67,13 @@ class OneSignalHandler {
   void _printDiagnostics() {
     try {
       if (kDebugMode) {
-        print('   Checking OneSignal subscription state:');
         try {
           final subscription = OneSignal.User.pushSubscription;
-          print('      Subscription object exists: ${subscription != null}');
-          print('      Subscription.id: "${subscription.id}"');
-          print('      Subscription.id type: ${subscription.id.runtimeType}');
-          print('      Subscription.id isEmpty: ${subscription.id?.isEmpty}');
-          print('      Subscription.optedIn: ${subscription.optedIn}');
         } catch (e) {
-          print('      Error accessing subscription: $e');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('   Error printing diagnostics: $e');
       }
     }
   }
@@ -103,7 +83,6 @@ class OneSignalHandler {
   Future<String?> getPlayerIdFromSdk() async {
     try {
       if (kDebugMode) {
-        print('   Fetching player ID from OneSignal SDK...');
       }
       
       final maxWaitTime = 8000; // 8 seconds total wait
@@ -121,12 +100,10 @@ class OneSignalHandler {
           playerId = OneSignal.User.pushSubscription.id;
           
           if (kDebugMode && attempts % 5 == 0) {
-            print('   ⏳ Attempt $attempts: ID="${playerId}", ${stopwatch.elapsedMilliseconds}ms');
           }
           
           if (playerId != null && playerId.isNotEmpty) {
             if (kDebugMode) {
-              print('   ✅ Player ID obtained: $playerId');
             }
             return playerId;
           }
@@ -135,24 +112,17 @@ class OneSignalHandler {
           await Future.delayed(Duration(milliseconds: checkInterval));
         } catch (e) {
           if (kDebugMode && attempts % 5 == 0) {
-            print('   ⚠️ Error accessing device state (attempt $attempts): $e');
           }
           await Future.delayed(Duration(milliseconds: checkInterval));
         }
       }
       
       if (kDebugMode) {
-        print('   ❌ Player ID timed out after ${stopwatch.elapsedMilliseconds}ms');
-        print('   ⚠️ This typically means:');
-        print('      - OneSignal SDK not fully initialized on native layer');
-        print('      - Device requires network connectivity for ID generation');
-        print('      - Check OneSignal Dashboard → App Settings');
       }
       
       return null;
     } catch (e) {
       if (kDebugMode) {
-        print('⚠️ Error getting player ID from SDK: $e');
       }
       return null;
     }
@@ -176,25 +146,21 @@ class OneSignalHandler {
       // Handle foreground notifications
       OneSignal.Notifications.addForegroundWillDisplayListener((event) {
         if (kDebugMode) {
-          print('🔔 Notification received (foreground): ${event.notification.body}');
         }
       });
 
       // Handle notification taps
       OneSignal.Notifications.addClickListener((event) {
         if (kDebugMode) {
-          print('🔔 Notification tapped');
         }
         final data = event.notification.additionalData ?? {};
         _handleNotificationTap(data);
       });
 
       if (kDebugMode) {
-        print('🔔 Notification handlers configured');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('⚠️ Error setting up notification handlers: $e');
       }
     }
   }
@@ -202,8 +168,6 @@ class OneSignalHandler {
   /// Handle notification tap - called when user taps a notification
   void _handleNotificationTap(Map<String, dynamic> data) {
     if (kDebugMode) {
-      print('🔔 Notification tapped');
-      print('   Data: $data');
     }
 
     // Call the registered handler if provided
@@ -217,18 +181,15 @@ class OneSignalHandler {
   Future<void> requestNotificationPermission() async {
     try {
       if (kDebugMode) {
-        print('🔔 Requesting notification permissions');
       }
 
       // Request permission from OneSignal (this API exists and compiles)
       await OneSignal.Notifications.requestPermission(true);
 
       if (kDebugMode) {
-        print('✅ Notification permission requested');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('⚠️ Error requesting notification permission: $e');
       }
       // Don't rethrow - permission denial should not block app functionality
     }
@@ -241,7 +202,6 @@ class OneSignalHandler {
     _notificationTapHandler = null;
 
     if (kDebugMode) {
-      print('🔔 OneSignal cleaned up on logout');
     }
   }
 }

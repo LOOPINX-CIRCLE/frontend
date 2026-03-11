@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart';
 import 'package:text_code/core/services/event_request_service_host.dart';
-import 'package:text_code/core/models/requester_profile.dart';
+
 import 'package:text_code/core/network/api_exception.dart';
-import 'package:text_code/Reusable/tab_content_ui.dart';
+
 import 'package:text_code/core/utils/image_url_helper.dart';
 
 class RequestUser {
@@ -76,10 +76,10 @@ class _JoinRequestScreenState extends State<JoinRequestScreen> {
       }
 
       // Get all requests with their status from first API
-      print('[FORCE PRINT] Calling getEventRequestsWithStatus...');
+      
       final requestsWithStatus = await _eventRequestService.getEventRequestsWithStatus(widget.eventId);
       print('[FORCE PRINT] getEventRequestsWithStatus returned ${requestsWithStatus.length} requests');
-      print('[FORCE PRINT] Status map: $requestsWithStatus');
+     
       
       if (kDebugMode) {
         print('Found ${requestsWithStatus.length} requests with statuses');

@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿
 import 'package:flutter/foundation.dart';
 import 'package:text_code/core/network/api_client.dart';
 import 'package:text_code/core/network/api_exception.dart';
@@ -127,6 +127,7 @@ class InvitationService {
 
   /// Search for users to invite
   /// Returns a list of users matching the search query
+  /// Note: event_id is required by the backend even though it's a global search
   Future<SearchUserResponse> searchUsers({
     required int eventId,
     String? search,
@@ -144,17 +145,17 @@ class InvitationService {
         );
       }
 
-      // Build query parameters as URI query string
-      final queryBuffer = StringBuffer('/events/users/search?');
-      queryBuffer.write('event_id=$eventId&offset=$offset&limit=$limit');
+      // Build query parameters - event_id is REQUIRED by backend
+      final queryParams = StringBuffer('event_id=$eventId&offset=$offset&limit=$limit');
       
       if (search != null && search.isNotEmpty) {
-        queryBuffer.write('&search=${Uri.encodeComponent(search)}');
+        queryParams.write('&search=${Uri.encodeComponent(search)}');
       }
 
-      final endpoint = queryBuffer.toString();
+      final endpoint = '/api/events/users/search?$queryParams';
 
-
+      if (kDebugMode) {
+      }
 
       final response = await _apiClient.get(
         endpoint,
@@ -164,14 +165,6 @@ class InvitationService {
       );
 
       if (kDebugMode) {
-        print('✅ [InvitationService.searchUsers] Got API response');
-        print('   Response keys: ${response.keys.toList()}');
-        if (response.containsKey('total')) {
-          print('   total: ${response['total']}');
-          print('   offset: ${response['offset']}');
-          print('   limit: ${response['limit']}');
-          print('   data length: ${(response['data'] as List?)?.length ?? 0}');
-        }
       }
 
       return SearchUserResponse.fromJson(response);
@@ -179,7 +172,6 @@ class InvitationService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in searchUsers: $e');
       }
       throw ApiException(
         message: 'Failed to search users: ${e.toString()}',
@@ -187,6 +179,7 @@ class InvitationService {
       );
     }
   }
+
 
   /// Send invitations to multiple users
   /// Returns the invitation response with created count and details
@@ -214,14 +207,10 @@ class InvitationService {
       };
 
       if (kDebugMode) {
-        print('📤 Sending invitations to event $eventId');
-        print('   User IDs: $userIds (Count: ${userIds.length})');
-        print('   Message: $message');
-        print('   Expiry Policy: $expiryPolicy');
       }
 
       final response = await _apiClient.post(
-        '/events/$eventId/invitations',
+        '/api/events/$eventId/invitations',
         body: requestBody,
         headers: {
           'Authorization': 'Bearer $token',
@@ -231,11 +220,7 @@ class InvitationService {
       final result = InvitationResponse.fromJson(response);
       
       if (kDebugMode) {
-        print('✅ Invitations processed:');
-        print('   Created: ${result.createdCount}');
-        print('   Skipped: ${result.skippedCount}');
         if (result.errors.isNotEmpty) {
-          print('   Errors: ${result.errors}');
         }
       }
       
@@ -244,7 +229,6 @@ class InvitationService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in sendInvitations: $e');
       }
       throw ApiException(
         message: 'Failed to send invitations: ${e.toString()}',
@@ -268,18 +252,16 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('👥 Getting attendees for event: $eventId');
       }
 
       final response = await _apiClient.get(
-        '/events/$eventId/attendees',
+        '/api/events/$eventId/attendees',
         headers: {
           'Authorization': 'Bearer $token',
         },
       );
 
       if (kDebugMode) {
-        print('📥 Get attendees response received');
       }
       // Handle API response format: { "going_count": N, "attendees": [...] }
       List<dynamic> attendeesList = [];
@@ -289,7 +271,6 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('✅ Parsed ${attendeesList.length} attendees');
       }
 
       return attendeesList
@@ -299,7 +280,6 @@ class InvitationService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in getEventAttendees: $e');
       }
       throw ApiException(
         message: 'Failed to get attendees: ${e.toString()}',
@@ -326,11 +306,10 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('✅ Checking in user $userId to event $eventId');
       }
 
       final response = await _apiClient.post(
-        '/events/$eventId/attendees/$userId/check-in',
+        '/api/events/$eventId/attendees/$userId/check-in',
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -339,14 +318,12 @@ class InvitationService {
       final result = response['success'] ?? false;
       
       if (kDebugMode) {
-        print('✅ Check-in successful: $result');
       }
       return result;
     } on ApiException {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in checkInUser: $e');
       }
       throw ApiException(
         message: 'Failed to check in: ${e.toString()}',
@@ -369,18 +346,16 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('📋 Getting check-in status for event: $eventId');
       }
 
       final response = await _apiClient.get(
-        '/events/$eventId/check-ins',
+        '/api/events/$eventId/check-ins',
         headers: {
           'Authorization': 'Bearer $token',
         },
       );
 
       if (kDebugMode) {
-        print('📥 Check-in status response received');
       }
 
       Map<int, bool> checkInMap = {};
@@ -396,7 +371,6 @@ class InvitationService {
       }
       
       if (kDebugMode) {
-        print('✅ Check-in status retrieved: ${checkInMap.length} users checked in');
       }
       
       return checkInMap;
@@ -404,7 +378,6 @@ class InvitationService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in getCheckInStatus: $e');
       }
       throw ApiException(
         message: 'Failed to get check-in status: ${e.toString()}',
@@ -431,18 +404,16 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('📋 Getting invitations for event: $eventId');
       }
 
       final response = await _apiClient.get(
-        '/events/$eventId/invitations',
+        '/api/events/$eventId/invitations',
         headers: {
           'Authorization': 'Bearer $token',
         },
       );
 
       if (kDebugMode) {
-        print('📥 Get invitations response received');
       }
 
       // Handle new API response format: { "total_invitations_count": N, "invitations": [...] }
@@ -454,7 +425,6 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('✅ Parsed ${invitationsList.length} invitations');
       }
 
       return invitationsList
@@ -464,7 +434,6 @@ class InvitationService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in getEventInvitations: $e');
       }
       throw ApiException(
         message: 'Failed to get invitations: ${e.toString()}',
@@ -492,11 +461,10 @@ class InvitationService {
       }
 
       if (kDebugMode) {
-        print('✅ Checking in attendee with ticket secret: $ticketSecret');
       }
 
       final response = await _apiClient.post(
-        '/events/$eventId/check-in',
+        '/api/events/$eventId/check-in',
         body: {
           'ticket_secret': ticketSecret,
         },
@@ -506,7 +474,6 @@ class InvitationService {
       );
 
       if (kDebugMode) {
-        print('✅ Check-in successful');
       }
 
       return {
@@ -518,7 +485,6 @@ class InvitationService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in checkInWithTicketSecret: $e');
       }
       throw ApiException(
         message: 'Failed to check in: ${e.toString()}',
@@ -535,6 +501,8 @@ class EventAttendee {
   final String? profilePictureUrl;
   final String? ticketSecret;
   final bool isCheckedIn;
+  final String status;
+  final int seats;
 
   EventAttendee({
     required this.userId,
@@ -543,6 +511,8 @@ class EventAttendee {
     this.profilePictureUrl,
     this.ticketSecret,
     this.isCheckedIn = false,
+    this.status = 'going',
+    this.seats = 1,
   });
 
   factory EventAttendee.fromJson(Map<String, dynamic> json) {
@@ -553,6 +523,8 @@ class EventAttendee {
       profilePictureUrl: json['profile_picture_url'] as String?,
       ticketSecret: json['ticket_secret'] as String?,
       isCheckedIn: json['checked_in'] as bool? ?? json['is_checked_in'] as bool? ?? false,
+      status: json['status'] as String? ?? 'going',
+      seats: json['seats'] as int? ?? 1,
     );
   }
 }

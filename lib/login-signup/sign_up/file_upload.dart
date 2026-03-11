@@ -3,8 +3,7 @@ import 'dart:typed_data';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
-import 'package:text_code/login-signup/sign_up/waitlist.dart';
-import 'package:text_code/Home_pages/UI_Design/home_page.dart';
+
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:text_code/profilePage/profile_controller.dart';

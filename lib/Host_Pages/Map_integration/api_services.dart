@@ -11,7 +11,7 @@ class ApiServicesMap {
     if (kDebugMode) {
       print("🔍 fetchPlaceSuggestions called with input: '$input'");
       print("🗝️ API Key from Env: '${apiKey.isEmpty ? 'EMPTY' : 'LOADED (${apiKey.length} chars)'}");
-      print("🌐 Running on web: ${kIsWeb}");
+      print("🌐 Running on web: $kIsWeb");
     }
     
     if (apiKey.isEmpty) {

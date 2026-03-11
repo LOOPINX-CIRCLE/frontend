@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:text_code/core/constants/api_constants.dart';
@@ -31,7 +31,6 @@ class TicketService {
       };
 
       if (kDebugMode) {
-        print('Fetching all user tickets: $url');
       }
 
       // Send the request
@@ -46,8 +45,6 @@ class TicketService {
       );
 
       if (kDebugMode) {
-        print('Get all tickets response status: ${response.statusCode}');
-        print('Response body: ${response.body}');
       }
 
       // Handle response
@@ -59,7 +56,6 @@ class TicketService {
             .toList();
 
         if (kDebugMode) {
-          print('Fetched ${tickets.length} tickets');
         }
 
         return tickets;
@@ -99,7 +95,6 @@ class TicketService {
         rethrow;
       }
       if (kDebugMode) {
-        print('Error fetching all user tickets: $e');
       }
       throw ApiException(
         message: 'Network error: ${e.toString()}',

@@ -88,7 +88,7 @@ class _WaitVideoState extends State<WaitVideo> {
             });
           }
         } catch (playError) {
-          print('Failed to play video: $playError');
+         
           if (mounted) {
             setState(() {
               _needsUserInteraction = true;
@@ -147,7 +147,6 @@ class _WaitVideoState extends State<WaitVideo> {
           });
         }
       }).catchError((e) {
-        print('Failed to play after user interaction: $e');
       });
     }
   }

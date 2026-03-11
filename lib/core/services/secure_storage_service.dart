@@ -1,4 +1,4 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+﻿import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
 
 /// Service for securely storing and retrieving sensitive data
@@ -21,15 +21,13 @@ class SecureStorageService {
   /// Store authentication token securely
   Future<void> saveToken(String token) async {
     try {
-      // ✅ Ensure no whitespace in stored token
+      // âœ… Ensure no whitespace in stored token
       final cleanToken = token.trim();
       await _storage.write(key: _tokenKey, value: cleanToken);
       if (kDebugMode) {
-        print('✅ Token saved securely (length: ${cleanToken.length})');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error saving token: $e');
       }
       rethrow;
     }
@@ -39,13 +37,9 @@ class SecureStorageService {
   Future<String?> getToken() async {
     try {
       final token = await _storage.read(key: _tokenKey);
-      if (kDebugMode) {
-        print('Token retrieved: ${token != null ? 'exists' : 'null'}');
-      }
       return token;
     } catch (e) {
       if (kDebugMode) {
-        print('Error retrieving token: $e');
       }
       return null;
     }
@@ -56,11 +50,9 @@ class SecureStorageService {
     try {
       await _storage.delete(key: _tokenKey);
       if (kDebugMode) {
-        print('Token deleted');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error deleting token: $e');
       }
     }
   }
@@ -85,11 +77,9 @@ class SecureStorageService {
       await _storage.write(key: _pendingPaymentEventIdKey, value: eventId.toString());
       await _storage.write(key: _pendingPaymentTimestampKey, value: timestamp);
       if (kDebugMode) {
-        print('Pending payment saved: orderId=$orderId, eventId=$eventId');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error saving pending payment: $e');
       }
     }
   }
@@ -121,13 +111,11 @@ class SecureStorageService {
         // Payment expired, clear it
         await clearPendingPayment();
         if (kDebugMode) {
-          print('Pending payment expired (${difference.inMinutes} minutes old)');
         }
         return null;
       }
 
       if (kDebugMode) {
-        print('Pending payment found: orderId=$orderId, eventId=$eventId, age=${difference.inSeconds}s');
       }
 
       return {
@@ -137,7 +125,6 @@ class SecureStorageService {
       };
     } catch (e) {
       if (kDebugMode) {
-        print('Error getting pending payment: $e');
       }
       return null;
     }
@@ -150,11 +137,9 @@ class SecureStorageService {
       await _storage.delete(key: _pendingPaymentEventIdKey);
       await _storage.delete(key: _pendingPaymentTimestampKey);
       if (kDebugMode) {
-        print('Pending payment cleared');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error clearing pending payment: $e');
       }
     }
   }

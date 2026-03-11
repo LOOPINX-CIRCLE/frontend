@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:text_code/core/models/payment_order_response.dart';
 import 'package:text_code/core/services/payment_service.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';

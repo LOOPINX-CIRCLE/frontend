@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:text_code/core/constants/api_constants.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:text_code/core/models/event_request.dart';
 import 'package:text_code/core/models/requester_profile.dart';
 import 'package:text_code/core/network/api_client.dart';
@@ -31,14 +29,9 @@ class EventRequestService {
         );
       }
 
-      if (kDebugMode) {
-        print('📤 Sending event request for event $eventId');
-        print('   Message: $message');
-        print('   Seats requested: $seatsRequested');
-      }
 
       final response = await _apiClient.post(
-        '/events/$eventId/requests',
+        '/api/events/$eventId/requests',
         body: {
           'message': message,
           'seats_requested': seatsRequested,
@@ -48,17 +41,11 @@ class EventRequestService {
         },
       );
 
-      if (kDebugMode) {
-        print('✅ Event request sent successfully');
-      }
 
       return response;
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error sending event request: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
@@ -76,37 +63,25 @@ class EventRequestService {
         return null;
       }
 
-      if (kDebugMode) {
-        print('📋 Getting request status for event: $eventId');
-      }
 
       try {
         final response = await _apiClient.get(
-          '/events/$eventId/my-request',
+          '/api/events/$eventId/my-request',
           headers: {
             'Authorization': 'Bearer $token',
           },
         );
 
-        if (kDebugMode) {
-          print('✅ Get Request Status - response received');
-        }
 
         return EventRequest.fromJson(response);
       } on ApiException catch (e) {
         if (e.statusCode == 404) {
           // No request found - this is normal
-          if (kDebugMode) {
-            print('No request found for event: $eventId');
-          }
           return null;
         }
         rethrow;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error getting request status: $e');
-      }
       return null; // Return null on error instead of throwing
     }
   }
@@ -117,9 +92,6 @@ class EventRequestService {
       final request = await getUserRequestStatus(eventId);
       return request != null;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error checking user request status: $e');
-      }
       return false;
     }
   }
@@ -138,28 +110,19 @@ class EventRequestService {
         );
       }
 
-      if (kDebugMode) {
-        print('👤 Fetching requester profile for event: $eventId, request: $requestId');
-      }
 
       final response = await _apiClient.get(
-        '/events/$eventId/requests/$requestId/profile',
+        '/api/events/$eventId/requests/$requestId/profile',
         headers: {
           'Authorization': 'Bearer $token',
         },
       );
 
-      if (kDebugMode) {
-        print('✅ Profile response received');
-      }
 
       return RequesterProfile.fromJson(response);
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error fetching requester profile: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
@@ -182,14 +145,9 @@ class EventRequestService {
         );
       }
 
-      if (kDebugMode) {
-        print('✅ Accepting request for event $eventId');
-        print('   Request ID: $requestId');
-        print('   Host Message: $hostMessage');
-      }
 
       final response = await _apiClient.put(
-        '/events/$eventId/requests/$requestId/accept',
+        '/api/events/$eventId/requests/$requestId/accept',
         body: {
           'host_message': hostMessage ?? '',
         },
@@ -198,17 +156,11 @@ class EventRequestService {
         },
       );
 
-      if (kDebugMode) {
-        print('✅ Request accepted successfully');
-      }
 
       return response;
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error accepting request: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
@@ -220,9 +172,6 @@ class EventRequestService {
   /// Get all requests for an event with their status and details
   /// Returns a map of request ID to status
   Future<Map<int, String>> getEventRequestsWithStatus(int eventId) async {
-    if (kDebugMode) {
-      print('\n[EventRequestService] getEventRequestsWithStatus called for event: $eventId');
-    }
     try {
       final token = await _secureStorage.getToken();
       if (token == null) {
@@ -232,21 +181,14 @@ class EventRequestService {
         );
       }
 
-      if (kDebugMode) {
-        print('\n========== GET REQUESTS WITH STATUS ==========');
-        print('Event ID: $eventId');
-      }
 
       final response = await _apiClient.get(
-        '/events/$eventId/requests',
+        '/api/events/$eventId/requests',
         headers: {
           'Authorization': 'Bearer $token',
         },
       );
 
-      if (kDebugMode) {
-        print('Response received\n');
-      }
 
       Map<int, String> requestsWithStatus = {};
 
@@ -261,26 +203,16 @@ class EventRequestService {
             
             if (id != null) {
               requestsWithStatus[id] = status;
-              if (kDebugMode) {
-                print('[Request] ID: $id, Status: $status, Name: ${item['full_name']}');
-              }
             }
           }
         }
       }
       
-      if (kDebugMode) {
-        print('Total requests with status: ${requestsWithStatus.length}');
-        print('==========================================\n');
-      }
 
       return requestsWithStatus;
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error fetching requests with status: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
@@ -300,13 +232,10 @@ class EventRequestService {
         );
       }
 
-      if (kDebugMode) {
-        print('📋 Getting pending requests for event: $eventId');
-      }
 
       try {
         final response = await _apiClient.get(
-          '/events/$eventId/requests',
+          '/api/events/$eventId/requests',
           headers: {
             'Authorization': 'Bearer $token',
           },
@@ -341,9 +270,6 @@ class EventRequestService {
         rethrow;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error getting pending requests: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
@@ -375,21 +301,14 @@ class EventRequestService {
       // Get auth token (optional for public events, but include if available)
       final token = await _secureStorage.getToken();
       
-      if (kDebugMode) {
-        print('🔗 Fetching share URL for event: $eventId');
-      }
 
       final response = await _apiClient.get(
-        '/events/$eventId/share-url',
+        '/api/events/$eventId/share-url',
         headers: {
           if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
         },
       );
 
-      if (kDebugMode) {
-        print('✅ Share URL response received');
-        print('   Response: $response');
-      }
 
       // Extract the canonical_url from response
       var canonicalUrl = response['canonical_url'] as String?;
@@ -399,9 +318,6 @@ class EventRequestService {
         final canonicalPath = response['canonical_path'] as String?;
         if (canonicalPath != null && canonicalPath.isNotEmpty) {
           canonicalUrl = canonicalPath;
-          if (kDebugMode) {
-            print('   Using canonical_path (fallback): $canonicalUrl');
-          }
         }
       }
       
@@ -415,19 +331,11 @@ class EventRequestService {
       // Ensure we have the full URL with domain
       final fullUrl = _buildFullShareUrl(canonicalUrl);
 
-      if (kDebugMode) {
-        print('✅ Share URL retrieved: $fullUrl');
-        print('   Raw from API: $canonicalUrl');
-        print('   Full URL: $fullUrl');
-      }
 
       return fullUrl;
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error getting share URL: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
@@ -438,9 +346,6 @@ class EventRequestService {
   /// Get all requests for an event with full details
   /// Returns list of request objects with user information
   Future<List<Map<String, dynamic>>> getAllEventRequests(int eventId) async {
-    if (kDebugMode) {
-      print('\n[EventRequestService] getAllEventRequests called for event: $eventId');
-    }
     try {
       final token = await _secureStorage.getToken();
       if (token == null) {
@@ -450,12 +355,9 @@ class EventRequestService {
         );
       }
 
-      if (kDebugMode) {
-        print('Fetching all requests for event: $eventId');
-      }
 
       final response = await _apiClient.get(
-        '/events/$eventId/requests',
+        '/api/events/$eventId/requests',
         headers: {
           'Authorization': 'Bearer $token',
         },
@@ -470,25 +372,175 @@ class EventRequestService {
         for (var item in requests) {
           if (item is Map) {
             allRequests.add(Map<String, dynamic>.from(item));
-            if (kDebugMode) {
-              print('[Request] ID: ${item['id']}, Name: ${item['full_name']}, Status: ${item['status']}');
-            }
           }
         }
       }
       
-      if (kDebugMode) {
-        print('Total requests fetched: ${allRequests.length}');
-        print('==========================================\n');
+
+      return allRequests;
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(
+        message: 'Network error: ${e.toString()}',
+        statusCode: 500,
+      );
+    }
+  }
+
+  /// Confirm attendance for a FREE event after request acceptance
+  /// This generates a ticket immediately for FREE events
+  /// CRITICAL: Only works for FREE events. Paid events must complete payment first.
+  /// Called by: User confirms attendance after their request is accepted
+  Future<Map<String, dynamic>> confirmAttendance({
+    required int eventId,
+    required int seats,
+  }) async {
+    try {
+      final token = await _secureStorage.getToken();
+      if (token == null) {
+        throw ApiException(
+          message: 'Authentication token not found',
+          statusCode: 401,
+        );
+      }
+
+
+      final response = await _apiClient.post(
+        '/api/events/$eventId/confirm-attendance',
+        body: {
+          'seats': seats,
+        },
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+
+      return response;
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(
+        message: 'Network error: ${e.toString()}',
+        statusCode: 500,
+      );
+    }
+  }
+
+  /// Get ticket data for a specific event
+  /// Used after payment confirmation to fetch ticket details
+  /// Returns ticket data including ticket_id, ticket_secret, event details
+  Future<Map<String, dynamic>> getTicket(int eventId) async {
+    try {
+      final token = await _secureStorage.getToken();
+      if (token == null) {
+        throw ApiException(
+          message: 'Authentication token not found',
+          statusCode: 401,
+        );
+      }
+
+
+      final response = await _apiClient.get(
+        '/api/events/$eventId/my-ticket',
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+
+      return response;
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(
+        message: 'Network error: ${e.toString()}',
+        statusCode: 500,
+      );
+    }
+  }
+
+  /// Get all user's requests across all events (no event ID needed)
+  /// Returns all requests made by the current user
+  /// Used for home page to build request status map
+  /// Get request statuses for multiple events by fetching individual status for each
+  /// This is a fallback approach when /api/events/my-requests is not available
+  Future<List<Map<String, dynamic>>> getAllUserRequestsIndividual(List<int> eventIds) async {
+    try {
+      final token = await _secureStorage.getToken();
+      if (token == null) {
+        throw ApiException(
+          message: 'Authentication token not found',
+          statusCode: 401,
+        );
+      }
+
+
+      List<Map<String, dynamic>> allRequests = [];
+
+      // Fetch request status for each event
+      for (final eventId in eventIds) {
+        try {
+          final request = await getUserRequestStatus(eventId);
+          if (request != null) {
+            // Convert EventRequest to Map
+            allRequests.add({
+              'event_id': eventId,
+              'status': request.status,
+              'can_confirm': request.canConfirm,
+              'request_id': request.requestId,
+            });
+          }
+        } catch (e) {
+          // Skip if error fetching this event's request
+        }
+      }
+
+
+      return allRequests;
+    } catch (e) {
+      throw ApiException(
+        message: 'Network error: ${e.toString()}',
+        statusCode: 500,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAllUserRequests() async {
+    try {
+      final token = await _secureStorage.getToken();
+      if (token == null) {
+        throw ApiException(
+          message: 'Authentication token not found',
+          statusCode: 401,
+        );
+      }
+
+
+      final response = await _apiClient.get(
+        '/api/events/my-requests',
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      List<Map<String, dynamic>> allRequests = [];
+
+      // Handle response - API returns object with 'requests' key containing list
+      if (response.containsKey('requests')) {
+        final requests = response['requests'] as List? ?? [];
+        for (var item in requests) {
+          if (item is Map) {
+            allRequests.add(Map<String, dynamic>.from(item));
+          }
+        }
       }
 
       return allRequests;
     } on ApiException {
       rethrow;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error getting all requests: $e');
-      }
       throw ApiException(
         message: 'Network error: ${e.toString()}',
         statusCode: 500,
