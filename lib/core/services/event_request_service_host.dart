@@ -282,7 +282,11 @@ class EventRequestService {
   /// Constructs a full shareable URL from a path
   String _buildFullShareUrl(String urlOrPath) {
     if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
-      // Already a full URL
+      // Already a full URL - replace domain if needed
+      if (urlOrPath.contains('loopinsocial.in')) {
+        return urlOrPath.replaceAll('https://loopinsocial.in', 'https://invite.loopinsocial.in')
+                        .replaceAll('http://loopinsocial.in', 'https://invite.loopinsocial.in');
+      }
       return urlOrPath;
     }
     
@@ -292,8 +296,8 @@ class EventRequestService {
       path = '/$path';
     }
     
-    // Prepend the full domain
-    return 'https://loopinsocial.in$path';
+    // Prepend the invite domain
+    return 'https://invite.loopinsocial.in$path';
   }
 
   Future<String> getEventShareUrl(int eventId) async {

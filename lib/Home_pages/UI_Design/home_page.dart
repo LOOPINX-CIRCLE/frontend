@@ -690,10 +690,34 @@ class _HomePagesState extends State<HomePages> {
         }
       },
       onFirstButtonTap: () {
-        print("Going button tapped for ${event.title}");
+        // "Going" button - Confirm attendance and generate ticket
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EventDetail(
+              eventId: event.id,
+              title: event.title,
+              date: event.startTime,
+              time: event.formattedTime,
+              hostName: event.host.name,
+              hostImage: event.host.profileImage ?? 'assets/images/avatar.png',
+              eventImage: event.coverImages.isNotEmpty ? event.coverImages[0] : 'assets/images/image (2).png',
+              venue: event.location.name,
+              fullAddress: event.location.address,
+              aboutEvent: event.description.isNotEmpty ? event.description : 'Event details coming soon',
+              badgeText: badgeText,
+              attendeesCount: event.goingCount,
+              attendeeImages: [],
+              isGoing: true,
+              price: event.isPaid && event.ticketPrice != null ? event.ticketPrice : null,
+            ),
+          ),
+        );
       },
       onSecondButtonTap: () {
+        // "Not Going" button - Decline invitation/request
         print("Not Going button tapped for ${event.title}");
+        // TODO: Implement decline invitation API call
       },
     );
   }
