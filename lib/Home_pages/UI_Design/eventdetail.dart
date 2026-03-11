@@ -12,13 +12,14 @@ import 'package:text_code/Reusable/loopin_cta_button.dart';
 import 'package:text_code/core/constants/env.dart';
 import 'package:text_code/Reusable/smart_image.dart';
 import 'package:text_code/core/utils/image_url_helper.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
-import 'package:text_code/login-signup/sign_up/booked_ticket.dart';
+
 import 'package:text_code/Home_pages/Controller/home_page.dart';
 import 'package:text_code/Home_pages/UI_Design/home_with_tabs.dart';
 import 'package:text_code/core/models/event_invitation.dart';
+import 'package:text_code/core/models/event_request.dart';
 
 
 class EventDetail extends StatefulWidget {
@@ -68,7 +69,7 @@ class _EventDetailState extends State<EventDetail> {
   bool isSendingRequest = false; // Track if request is being sent
   bool isLoadingRequestStatus = true; // Track if we're loading request status
   bool isConfirmingAttendance = false; // Track if we're confirming attendance
-  Map<String, dynamic>? requestStatus; // Store request status from API
+  EventRequest? requestStatus; // Store request status from API
   final EventRequestService _eventRequestService = EventRequestService();
   EventInvitation? _eventInvitation; // Matching invitation, if any
   
@@ -133,7 +134,7 @@ class _EventDetailState extends State<EventDetail> {
         });
         
         if (kDebugMode) {
-          print('Request status fetched: ${status?['status'] ?? 'no request'}');
+          print('Request status fetched: ${status?.status ?? 'no request'}');
           print('Full request status: $status');
           print('isRequestSent: $isRequestSent');
         }
@@ -490,9 +491,9 @@ class _EventDetailState extends State<EventDetail> {
     }
 
     // Check if request is accepted
-    if (requestStatus == null || requestStatus?['status'] != 'accepted') {
+    if (requestStatus == null || requestStatus?.status != 'accepted') {
       if (kDebugMode) {
-        print('Request not accepted yet. Status: ${requestStatus?['status']}');
+        print('Request not accepted yet. Status: ${requestStatus?.status}');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -778,7 +779,7 @@ class _EventDetailState extends State<EventDetail> {
     // Get request status from API response - handle different possible formats
     String requestStatusString = '';
     if (requestStatus != null) {
-      final statusValue = requestStatus?['status'];
+      final statusValue = requestStatus?.status;
       if (statusValue != null) {
         requestStatusString = statusValue.toString().trim().toLowerCase();
       }
@@ -788,7 +789,7 @@ class _EventDetailState extends State<EventDetail> {
     final isRequestAccepted = requestStatusString == 'accepted';
     
     // Check can_confirm field from API response
-    final canConfirm = requestStatus?['can_confirm'] as bool? ?? true;
+    final canConfirm = requestStatus?.canConfirm ?? true;
     
     // Show "View Ticket" button when: status == "accepted" AND can_confirm == false
     final shouldShowViewTicket = isRequestAccepted && !canConfirm;

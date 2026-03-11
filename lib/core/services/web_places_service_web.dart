@@ -1,4 +1,4 @@
-// Web-specific Places service using JavaScript interop
+﻿// Web-specific Places service using JavaScript interop
 import 'dart:async';
 import 'dart:js' as js;
 import 'package:flutter/foundation.dart';
@@ -11,7 +11,6 @@ class WebPlacesService {
     if (_isInitialized) return;
     
     if (kDebugMode) {
-      print('🚀 Initializing WebPlacesService for web...');
     }
     
     try {
@@ -24,7 +23,6 @@ class WebPlacesService {
           _initCompleter.complete();
         }
         if (kDebugMode) {
-          print('✅ Google Maps Places API already loaded');
         }
         return;
       }
@@ -45,25 +43,21 @@ class WebPlacesService {
             _initCompleter.complete();
           }
           if (kDebugMode) {
-            print('✅ Google Maps Places API loaded after ${attempts * 100}ms');
           }
           return;
         }
         
         if (kDebugMode && attempts % 10 == 0) {
-          print('⏳ Still waiting for Google Maps API... (${attempts * 100}ms)');
         }
       }
       
       if (kDebugMode) {
-        print('❌ Google Maps Places API failed to load after ${maxAttempts * 100}ms');
       }
       if (!_initCompleter.isCompleted) {
         _initCompleter.completeError('Google Maps Places API failed to load');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error initializing WebPlacesService: $e');
       }
       if (!_initCompleter.isCompleted) {
         _initCompleter.completeError(e);
@@ -78,7 +72,6 @@ class WebPlacesService {
       }
       
       if (kDebugMode) {
-        print('🔍 WebPlacesService: Fetching suggestions for "$input"');
       }
       
       final completer = Completer<List<String>>();
@@ -87,7 +80,6 @@ class WebPlacesService {
       js.context['flutterPlacesCallback'] = js.allowInterop((List results) {
         final suggestions = results.cast<String>();
         if (kDebugMode) {
-          print('📍 WebPlacesService: Got ${suggestions.length} suggestions');
         }
         if (!completer.isCompleted) {
           completer.complete(suggestions);
@@ -96,7 +88,6 @@ class WebPlacesService {
       
       js.context['flutterPlacesError'] = js.allowInterop((error) {
         if (kDebugMode) {
-          print('❌ WebPlacesService error: $error');
         }
         if (!completer.isCompleted) {
           completer.complete([]);
@@ -134,14 +125,12 @@ class WebPlacesService {
         const Duration(seconds: 5),
         onTimeout: () {
           if (kDebugMode) {
-            print('⏰ Places search timeout');
           }
           return <String>[];
         },
       );
     } catch (e) {
       if (kDebugMode) {
-        print('💥 WebPlacesService exception: $e');
       }
       return [];
     }

@@ -1,6 +1,5 @@
 
 import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:text_code/login-signup/sign_up/name_page.dart';
@@ -8,7 +7,6 @@ import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
-import 'package:text_code/core/services/push_notification_manager.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/waitHomePage/waitHome.dart';
 
@@ -99,36 +97,35 @@ class _OTPPageState extends State<OTPPage> {
           print('needs_profile_completion: $needsProfileCompletion, is_verified: $isVerified');
         }
         
-        // If profile is complete (needs_profile_completion = false) AND user is verified
+        // If profile is complete AND verified - navigate to home
         if (needsProfileCompletion == false && isVerified == true) {
           if (kDebugMode) {
             print('Navigating to home page - user is verified and profile complete');
           }
-          // User has completed profile and is verified - navigate to home page
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
-            (route) => false, // Remove all previous routes
+            (route) => false,
           );
-          } else {
-            if (kDebugMode) {
-              print('User is NOT active (in vetting queue). Navigating to WaitHome.');
-            }
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const WaitHome()),
-              (route) => false,
-            );
+        } else if (needsProfileCompletion == false && isVerified == false) {
+          // Profile complete but not yet verified - in vetting queue
+          if (kDebugMode) {
+            print('User is NOT active (in vetting queue). Navigating to WaitHome.');
           }
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const WaitHome()),
+            (route) => false,
+          );
         } else {
+          // Profile incomplete - needs to complete signup
           if (kDebugMode) {
             print('Navigating to name page - user needs to complete profile');
           }
-          // User needs to complete profile - navigate to name page
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => NameInputScreen()),
-        );
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => NameInputScreen()),
+          );
         }
       } else {
         // Handle failure case
@@ -372,7 +369,7 @@ class _OTPPageState extends State<OTPPage> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    _buildContinueButton(_isOtpComplete), // Moved inside here
+                    _buildContinueButton(),
                     const SizedBox(height: 8),
                     GestureDetector(
                       onTap: _isResending ? null : _resendOTP,
@@ -522,7 +519,7 @@ class _OTPPageState extends State<OTPPage> {
   //     );
   //   }
   // }
-  Widget _buildContinueButton(bool isActive) {
+  Widget _buildContinueButton() {
     return GestureDetector(
       onTap: () {
         if (_isOtpComplete && !_isLoading) {

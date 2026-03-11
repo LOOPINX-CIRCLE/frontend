@@ -62,11 +62,10 @@ class _MainScreenState extends State<MainScreen> {
     _actualInvitedCount = widget.invitedCount;
     _actualCheckInCount = 0; // Start with 0, will be populated from actual check-ins
     
-    // Fetch actual check-in count from API
+    // Fetch actual counts from API
+    _fetchActualRequestCount();
+    _fetchActualInvitedCount();
     _fetchActualCheckInCount();
-    
-    // DO NOT fetch counts in initState - use widget counts directly
-    // Real-time counts will be fetched only when user interacts with the UI
   }
 
   /// Fetch the actual pending request count from the API
@@ -171,6 +170,14 @@ class _MainScreenState extends State<MainScreen> {
   /// Refresh the actual check-in count when returning from EventCheckIn
   Future<void> _fetchActualCheckInCount() async {
     try {
+      // Check if eventId is null
+      if (widget.eventId == null) {
+        if (kDebugMode) {
+          print('⚠️ [_fetchActualCheckInCount] eventId is null, skipping check-in count fetch');
+        }
+        return;
+      }
+
       // Fetch attendees and count how many have actually checked in
       final attendees = await _invitationService.getEventAttendees(widget.eventId!);
       
@@ -191,9 +198,11 @@ class _MainScreenState extends State<MainScreen> {
         print('Error fetching check-in count: $e');
       }
       // Fallback to 0 if error
-      setState(() {
-        _actualCheckInCount = 0;
-      });
+      if (mounted) {
+        setState(() {
+          _actualCheckInCount = 0;
+        });
+      }
     }
   }
 
@@ -240,14 +249,13 @@ class _MainScreenState extends State<MainScreen> {
             _refreshAllCounts();
           },
           onRequestsTap: () async {
-            // Always use dynamic count from TabContentUI
-            final dynamicCount = TabContentUI.getRequestUsersCount();
+            // Use actual count from API (fetched in _fetchActualRequestCount)
             await RequestsEmpty.show(
                                   context,
                                   eventName: widget.eventName,
                                   eventPrice: widget.eventPrice,
               confirmedUsers: widget.confirmedUsers,
-              requestsCount: dynamicCount,
+              requestsCount: _actualRequestsCount,
               eventId: widget.eventId,
             );
             // Rebuild when modal closes to update counts

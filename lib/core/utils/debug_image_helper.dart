@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 /// Enhanced image loading with comprehensive error logging
@@ -35,12 +35,7 @@ class _DebugNetworkImageState extends State<DebugNetworkImage> {
       fit: widget.fit,
       errorBuilder: (context, error, stackTrace) {
         if (kDebugMode) {
-          print('[❌ IMAGE_FAILED] ${widget.debugLabel}');
-          print('   URL: ${widget.url}');
-          print('   Error Type: ${error.runtimeType}');
-          print('   Error: $error');
           if (stackTrace != null) {
-            print('   StackTrace: $stackTrace');
           }
         }
         if (stackTrace != null) {
@@ -100,11 +95,6 @@ class _ImageDiagnosticState extends State<ImageDiagnostic> {
 
   void _diagnosticLog() {
     if (kDebugMode) {
-      print('📸 [IMAGE_DIAGNOSTIC] ${widget.debugLabel ?? "Unknown"}');
-      print('   Raw imagePath: ${widget.imagePath}');
-      print('   Resolved URL: ${widget.resolvedUrl}');
-      print('   Is Asset: ${widget.imagePath.startsWith("assets")}');
-      print('   Status: $_loadStatus');
     }
   }
 
@@ -119,9 +109,6 @@ class _ImageDiagnosticState extends State<ImageDiagnostic> {
       onBackgroundImageError: (error, stackTrace) {
         setState(() => _loadStatus = 'failed');
         if (kDebugMode) {
-          print('🔴 [IMAGE_LOAD_ERROR] ${widget.debugLabel ?? "Unknown"}');
-          print('   URL: ${widget.resolvedUrl}');
-          print('   Error: $error');
         }
       },
     );
@@ -136,13 +123,5 @@ void logImageLoadingChain({
   required bool isAsset,
 }) {
   if (kDebugMode) {
-    print('═' * 60);
-    print('📸 IMAGE LOADING CHAIN FOR: $userName');
-    print('═' * 60);
-    print('1️⃣  Raw imagePath from API/State: $rawImagePath');
-    print('2️⃣  Is Asset Path: $isAsset');
-    print('3️⃣  Resolved URL: $resolvedImageUrl');
-    print('4️⃣  URL starts with http: ${resolvedImageUrl.startsWith("http")}');
-    print('═' * 60);
   }
 }

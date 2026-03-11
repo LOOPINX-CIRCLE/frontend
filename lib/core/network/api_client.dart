@@ -15,7 +15,6 @@ class ApiClient {
   Uri _buildUri(String endpoint) {
     final normalizedEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
     final fullUrl = '${ApiConstants.baseUrl}$normalizedEndpoint';
-    print('Building URI: $fullUrl');
     return Uri.parse(fullUrl);
   }
 
@@ -37,11 +36,7 @@ class ApiClient {
         if (headers != null) ...headers,
       };
 
-      // Debug logging
-      if (kDebugMode) {
-        print('API Request: GET $uri');
-        print('Headers: $requestHeaders');
-      }
+
 
       final response = await _httpClient
           .get(
@@ -117,14 +112,6 @@ class ApiClient {
       // Use custom timeout if provided, otherwise use default
       final requestTimeout = timeout ?? ApiConstants.defaultTimeout;
 
-      // Debug logging
-      if (kDebugMode) {
-        print('API Request: POST $uri');
-        print('Headers: $requestHeaders');
-        print('Body: $requestBody');
-        print('Timeout: ${requestTimeout.inSeconds} seconds');
-      }
-
       final response = await _httpClient
           .post(
             uri,
@@ -132,10 +119,6 @@ class ApiClient {
             body: requestBody,
           )
           .timeout(requestTimeout);
-
-      // Debug logging
-      print('API Response: Status ${response.statusCode}');
-      print('Response Body: ${response.body}');
 
       return _parseResponse(response);
     } on TimeoutException catch (error) {

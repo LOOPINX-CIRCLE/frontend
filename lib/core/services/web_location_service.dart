@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:text_code/core/constants/env.dart';
@@ -10,8 +10,6 @@ class WebLocationService {
     final String apiKey = Env.googleMapsApiKey;
     
     if (kDebugMode) {
-      print("🌐 WebLocationService: Fetching for '$input'");
-      print("🌐 API Key available: ${apiKey.isNotEmpty}");
     }
     
     // Try JSONP approach first (sometimes works better for web CORS)
@@ -19,7 +17,6 @@ class WebLocationService {
       return await _fetchWithJSONP(input, apiKey);
     } catch (e) {
       if (kDebugMode) {
-        print("🌐 JSONP failed: $e");
       }
       // Fallback to regular HTTP request
       return await _fetchWithHTTP(input, apiKey);
@@ -34,7 +31,6 @@ class WebLocationService {
         "&key=$apiKey";
     
     if (kDebugMode) {
-      print("🌐 JSONP URL: ${url.replaceAll(apiKey, 'HIDDEN')}");
     }
     
     final response = await http.get(
@@ -55,13 +51,10 @@ class WebLocationService {
             .toList();
       } else {
         if (kDebugMode) {
-          print("🌐 API Error: ${data['status']} - ${data['error_message'] ?? ''}");
         }
       }
     } else {
       if (kDebugMode) {
-        print("🌐 HTTP Error: ${response.statusCode}");
-        print("🌐 Response: ${response.body}");
       }
     }
     
@@ -96,7 +89,6 @@ class WebLocationService {
       }
     } catch (e) {
       if (kDebugMode) {
-        print("🌐 HTTP fallback failed: $e");
       }
     }
     

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:text_code/core/models/event.dart';
 import 'package:text_code/core/network/api_client.dart';
 import 'package:text_code/core/network/api_exception.dart';
@@ -31,7 +31,6 @@ class EventService {
       }
 
       if (kDebugMode) {
-        print('Fetching event $eventId with token...');
       }
 
       final response = await _apiClient.get(
@@ -42,7 +41,6 @@ class EventService {
       );
 
       if (kDebugMode) {
-        print('Event response: $response');
       }
 
       // Handle validation errors
@@ -81,11 +79,10 @@ class EventService {
       }
 
       return Event.fromJson(eventData);
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('Error fetching event: $error');
       }
       throw ApiException(
         message: 'An error occurred while fetching event: ${error.toString()}',
@@ -111,7 +108,6 @@ class EventService {
       }
 
       if (kDebugMode) {
-        print('Fetching events list with token...');
       }
 
       // Try to fetch from /api/events endpoint (list endpoint)
@@ -123,7 +119,6 @@ class EventService {
       );
 
       if (kDebugMode) {
-        print('Events list response: $response');
       }
 
       // Handle validation errors
@@ -173,7 +168,6 @@ class EventService {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('Error fetching events: $error');
       }
       throw ApiException(
         message: 'An error occurred while fetching events: ${error.toString()}',
@@ -214,13 +208,6 @@ class EventService {
       final expiryPolicy = rsvpMapping[rsvpOption] ?? '48h';
 
       if (kDebugMode) {
-        print('\n========== RSVP UPDATE DEBUG ==========');
-        print('📝 Updating RSVP deadline for event $eventId');
-        print('   User Selected: "$rsvpOption"');
-        print('   Mapping Keys: ${rsvpMapping.keys.toList()}');
-        print('   Mapping Match: ${rsvpMapping.containsKey(rsvpOption)}');
-        print('   API Value: "$expiryPolicy"');
-        print('   Token: ${token.substring(0, 20)}...');
       }
 
       final requestBody = {
@@ -228,12 +215,10 @@ class EventService {
       };
 
       if (kDebugMode) {
-        print('   Request Body: $requestBody');
-        print('   Endpoint: /events/$eventId');
       }
 
       final response = await _apiClient.put(
-        '/events/$eventId',
+        '/api/events/$eventId',
         body: requestBody,
         headers: {
           'Authorization': 'Bearer $token',
@@ -241,11 +226,7 @@ class EventService {
         },
       );
 
-      if (kDebugMode) {
-        print('✅ RSVP update response status: ${response.toString().split('\n')[0]}');
-        print('📥 Full response: $response');
-        print('========== END DEBUG ==========\n');
-      }
+
 
       if (response.containsKey('success') && response['success'] == true) {
         return {
@@ -268,14 +249,10 @@ class EventService {
           'data': response,
         };
       }
-    } on ApiException catch (e) {
-      if (kDebugMode) {
-        print('❌ RSVP update error: ${e.message}');
-      }
+    } on ApiException {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('💥 Error updating RSVP: $error');
       }
       throw ApiException(
         message: 'An error occurred while updating RSVP deadline: ${error.toString()}',

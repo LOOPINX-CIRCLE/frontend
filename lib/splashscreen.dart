@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
 import 'package:text_code/core/services/payment_service.dart';
-import 'package:text_code/core/services/event_request_service.dart';
+import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
 import 'package:text_code/Home_pages/Ticket_Pages_navigation/ticket_fail_sucess/sucess_full_payment.dart';

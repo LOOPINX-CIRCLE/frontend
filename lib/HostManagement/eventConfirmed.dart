@@ -36,7 +36,7 @@ class _EventConfirmedState extends State<EventConfirmed> {
     return (1000 + (hash % 9000)).toString();
   }
 
-  /// Check if check-in is allowed (3 hours before event or after)
+  /// Check if check-in is allowed (3 hours before event start time, NOT after)
   bool _isCheckInAllowed() {
     if (widget.eventDateTime == null) {
       return false; // No event time specified
@@ -45,8 +45,9 @@ class _EventConfirmedState extends State<EventConfirmed> {
     final now = DateTime.now();
     final threeHoursBefore = widget.eventDateTime!.subtract(const Duration(hours: 3));
     
-    // Check-in is allowed from 3 hours before event until now (and after event)
-    return now.isAfter(threeHoursBefore);
+    // Check-in is ONLY allowed from 3 hours before event until event start time
+    // Once event starts, check-in is disabled
+    return now.isAfter(threeHoursBefore) && now.isBefore(widget.eventDateTime!);
   }
 
   /// Check user in via API

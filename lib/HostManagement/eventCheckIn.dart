@@ -542,6 +542,12 @@ class _EventCheckInState extends State<EventCheckIn> {
                       GestureDetector(
                         onTap: () {
                           // Navigate to Confirmed guests page
+                          if (widget.eventId == null || widget.eventId == 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Event ID is required to view confirmed guests')),
+                            );
+                            return;
+                          }
                           Navigator.pop(context);
                           Future.delayed(const Duration(milliseconds: 300), () {
                             if (mounted) {
@@ -550,7 +556,7 @@ class _EventCheckInState extends State<EventCheckIn> {
                                 isScrollControlled: true,
                                 backgroundColor: Colors.transparent,
                                 builder: (context) => ConfirmedLoader(
-                                  eventId: widget.eventId ?? 0,
+                                  eventId: widget.eventId!,
                                   isCheckInMode: false,
                                 ),
                               );

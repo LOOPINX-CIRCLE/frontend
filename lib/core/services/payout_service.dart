@@ -1,6 +1,4 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:text_code/core/constants/api_constants.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:text_code/core/network/api_client.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/core/services/auth_service.dart';
@@ -64,16 +62,10 @@ class PayoutService {
       };
 
       if (kDebugMode) {
-        print('🏦 Creating bank account...');
-        print('📝 Bank Name: ${requestBody['bank_name']}');
-        print('📝 Account Number: ${requestBody['account_number']}');
-        print('📝 IFSC Code: ${requestBody['ifsc_code']}');
-        print('📝 Account Holder: ${requestBody['account_holder_name']}');
-        print('📝 Is Primary: ${requestBody['is_primary']}');
       }
 
       final response = await _apiClient.post(
-        '/payouts/bank-accounts',
+        '/api/payouts/bank-accounts',
         body: requestBody,
         headers: {
           'Authorization': 'Bearer $token',
@@ -81,7 +73,6 @@ class PayoutService {
       );
 
       if (kDebugMode) {
-        print('✅ Bank account created successfully');
       }
 
       return {
@@ -93,7 +84,6 @@ class PayoutService {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('💥 Exception in createBankAccount: $e');
       }
       throw ApiException(
         message: 'Failed to create bank account: ${e.toString()}',

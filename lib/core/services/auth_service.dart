@@ -1,8 +1,6 @@
-import 'dart:convert';
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:text_code/core/network/api_client.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
@@ -36,8 +34,6 @@ class AuthService {
       final formattedPhoneNumber = '+$countryCode$phoneNumber';
       
       if (kDebugMode) {
-        print('Formatted phone number: $formattedPhoneNumber');
-        print('Sending OTP request... (this may take up to 2 minutes)');
       }
       
       final response = await _apiClient.post(
@@ -59,18 +55,13 @@ class AuthService {
       }
       
       if (kDebugMode) {
-        print('OTP request completed successfully');
       }
       
       return response;
-    } on ApiException catch (e) {
-      if (kDebugMode) {
-        print('OTP request failed: ${e.message}');
-      }
+    } on ApiException {
       rethrow;
     } catch (e) {
       if (kDebugMode) {
-        print('Unexpected error in sendOTP: $e');
       }
       rethrow;
     }
@@ -89,8 +80,6 @@ class AuthService {
       final formattedPhoneNumber = '+$countryCode$phoneNumber';
       
       if (kDebugMode) {
-        print('Verify OTP - Formatted phone number: $formattedPhoneNumber');
-        print('Verify OTP - OTP: $otp');
       }
       
       final response = await _apiClient.post(
@@ -103,7 +92,7 @@ class AuthService {
 
       // Check if verification was successful and token exists
       if (response['success'] == true && response['token'] != null) {
-        final token = (response['token'] as String).trim(); // ✅ Trim whitespace
+        final token = (response['token'] as String).trim(); // âœ… Trim whitespace
         // Store token securely
         await _secureStorage.saveToken(token);
 
@@ -117,7 +106,6 @@ class AuthService {
           profileController?.setProfile(profile);
         } catch (e) {
           if (kDebugMode) {
-            print('Failed to cache profile after login: $e');
           }
         }
       } else if (response['success'] == false) {
@@ -153,7 +141,6 @@ class AuthService {
       }
 
       if (kDebugMode) {
-        print('Fetching event interests with token...');
       }
 
       final response = await _apiClient.get(
@@ -164,7 +151,6 @@ class AuthService {
       );
 
       if (kDebugMode) {
-        print('Event interests response: $response');
       }
 
       // Parse response
@@ -184,7 +170,6 @@ class AuthService {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('Error fetching event interests: $error');
       }
       throw ApiException(
         message: 'An error occurred while fetching event interests: ${error.toString()}',
@@ -210,7 +195,6 @@ class AuthService {
       }
 
       if (kDebugMode) {
-        print('Fetching user profile with token...');
       }
 
       final response = await _apiClient.get(
@@ -221,10 +205,7 @@ class AuthService {
       );
 
       // Debug: Print raw API response for troubleshooting
-      print('DEBUG: Raw /auth/profile response:');
-      print(response);
       if (kDebugMode) {
-        print('Profile response: $response');
       }
 
       // Parse response: handle both wrapped and direct profile data
@@ -238,7 +219,6 @@ class AuthService {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('Error fetching profile: $error');
       }
       throw ApiException(
         message: 'An error occurred while fetching profile: ${error.toString()}',
@@ -261,13 +241,6 @@ class AuthService {
   }) async {
     try {
       if (kDebugMode) {
-        print('Completing profile with multipart upload...');
-        print('Phone: $phoneNumber');
-        print('Name: $name');
-        print('Birth Date: $birthDate');
-        print('Gender: $gender');
-        print('Event Interests: $eventInterests');
-        print('Profile Pictures: ${profilePictures.length} file(s)');
       }
 
       // Prepare fields
@@ -334,7 +307,6 @@ class AuthService {
         }
         
         if (kDebugMode) {
-          print('File $i: $filename, Size: ${bytes.length} bytes, Content-Type: $contentType');
         }
         
         // Try different field names - FastAPI might expect different naming
@@ -348,11 +320,10 @@ class AuthService {
         files.add(multipartFile);
         
         if (kDebugMode) {
-          print('Created multipart file: field=${multipartFile.field}, filename=$filename, length=${bytes.length}');
         }
       }
 
-      if (files.length < 1) {
+      if (files.isEmpty) {
         throw ApiException(
           message: 'At least 1 profile picture is required',
           statusCode: 400,
@@ -370,7 +341,6 @@ class AuthService {
       );
 
       if (kDebugMode) {
-        print('Complete profile response: $response');
       }
 
       // Check if the response indicates success
@@ -412,7 +382,6 @@ class AuthService {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('Error completing profile: $error');
       }
       throw ApiException(
         message: 'An error occurred while completing profile: ${error.toString()}',
@@ -430,8 +399,6 @@ class AuthService {
   }) async {
     try {
       if (kDebugMode) {
-        print('Completing profile with token...');
-        print('Payload: $payload');
       }
 
       final response = await _apiClient.post(
@@ -443,7 +410,6 @@ class AuthService {
       );
 
       if (kDebugMode) {
-        print('Complete profile response: $response');
       }
 
       // Check if the response indicates success
@@ -485,7 +451,6 @@ class AuthService {
       rethrow;
     } catch (error) {
       if (kDebugMode) {
-        print('Error completing profile: $error');
       }
       throw ApiException(
         message: 'An error occurred while completing profile: ${error.toString()}',
@@ -497,13 +462,11 @@ class AuthService {
   /// Get stored token (for external use if needed)
   Future<String?> getStoredToken() async {
     final token = await _secureStorage.getToken();
-    // ✅ Trim whitespace to ensure clean token
-    final cleanToken = token != null ? token.trim() : null;
+    // âœ… Trim whitespace to ensure clean token
+    final cleanToken = token?.trim();
     if (kDebugMode) {
       if (cleanToken != null) {
-        print('JWT Token retrieved: ${cleanToken.substring(0, 20)}... (length: ${cleanToken.length})');
       } else {
-        print('JWT Token: (null)');
       }
     }
     return cleanToken;

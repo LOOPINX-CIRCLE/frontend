@@ -11,7 +11,7 @@ class AuthRepository {
   Future<SendOtpResponse> sendOtp(String phoneNumber) async {
     try {
       final response = await _apiClient.post(
-        '/auth/signup',
+        '/api/auth/signup',
         body: {
           'phone_number': phoneNumber,
         },
