@@ -41,19 +41,19 @@ class _BottomBarState extends State<BottomBar> {
     super.dispose();
   }
 
+  // Bottom bar items: Home, Host, Profile (Discover tab removed)
   final List<String> _icons = [
-    'assets/icons/Homes.png',
-    'assets/icons/Stars.png',
-    'assets/icons/Crown Line.png',
-    "assets/icons/User.png",
+    'assets/icons/Homes.png',        // Home
+    'assets/icons/Crown Line.png',   // Host
+    "assets/icons/User.png",         // Profile
   ];
 
-  final List<String> _labels = ["Home", "Discover", "Host", "Profile"];
+  final List<String> _labels = ["Home", "Host", "Profile"];
+
   List<Widget> get _screens => [
-    const HomeWithTabs(initialTab: 0), // Home icon shows HomeWithTabs with Discover tab
-    const HomeWithTabs(initialTab: 0), // Star icon (Discover) shows HomeWithTabs with Discover tab
-    MainHostPage(),
-    ProfilePage(hasHomePagesAccess: true), // Profile page with dynamic photos - user has HomePages access
+    const HomeWithTabs(initialTab: 0),          // Home
+    MainHostPage(),                             // Host
+    ProfilePage(hasHomePagesAccess: true),      // Profile
   ];
 
   Widget _getBody() => _screens[_selectedIndex];
@@ -70,7 +70,7 @@ class _BottomBarState extends State<BottomBar> {
             bottom: 24, // 👈 move it a little up
             child: Container(
               height: 65,
-              width: 345,
+               width: 225,
               padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
               decoration: BoxDecoration(
                 color: const Color.fromRGBO(16, 16, 16, 0.80),

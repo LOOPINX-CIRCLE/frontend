@@ -9,10 +9,11 @@ import 'package:text_code/core/services/event_invitation_service.dart';
 class CityController extends GetxController {
   var selectedCity = "Mumbai".obs;
   var cities = [
-    {"name": "Mumbai", "image": "assets/images/mumbai.png"},
-    {"name": "Delhi", "image": "assets/images/delhi.png"},
-    {"name": "Bangalore", "image": "assets/images/bangalore.png"},
-    {"name": "Pune", "image": "assets/images/pune.png"},
+    {"name": "Mumbai", "image": "assets/images/Mumbaihoome.png"},
+    {"name": "Delhi", "image": "assets/images/delhihoome.png"},
+    {"name": "Dehradun", "image": "assets/images/dehradun.png"},
+    {"name": "Bangalore", "image": "assets/images/banglore.png"},
+    {"name": "Cochin", "image": "assets/images/coachin.png"},
   ].obs;
 
   void selectCity(String cityName) {

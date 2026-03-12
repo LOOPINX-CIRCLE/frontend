@@ -49,6 +49,8 @@ class InviteEventCard extends StatefulWidget {
   final String? buttonLabel;
   final LoopinButtonVariant buttonVariant;
   final VoidCallback? onUploadTap; // upload icon tap callback
+  // When true, render a special "View ticket" style button with icon
+  final bool isViewTicketButton;
 
   const InviteEventCard({
     super.key,
@@ -72,6 +74,7 @@ class InviteEventCard extends StatefulWidget {
     this.buttonLabel,
     this.buttonVariant = LoopinButtonVariant.primary,
     this.onUploadTap,
+    this.isViewTicketButton = false,
   });
 
   @override
@@ -149,7 +152,7 @@ class _InviteEventCardState extends State<InviteEventCard> {
             ),
           ),
 
-          // Price tag, "You're Going" pill and upload icon row
+          // Price tag, badge pill and upload icon row
           Positioned(
             top: 15,
             left: 16,
@@ -158,8 +161,13 @@ class _InviteEventCardState extends State<InviteEventCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Price Tag (Left Side) - hide for ended and "Deadline Has Passed"
-                if (!widget.isEnded && widget.badgeText != "Deadline Has Passed")
+                // Price Tag (Left Side)
+                // Hide for: ended, "Deadline Has Passed", attending (ticket generated),
+                // and events hosted by current user.
+                if (!widget.isEnded &&
+                    widget.badgeText != "Deadline Has Passed" &&
+                    widget.status != EventStatus.attending &&
+                    widget.status != EventStatus.hostedByCurrentUser)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: BackdropFilter(
@@ -196,8 +204,9 @@ class _InviteEventCardState extends State<InviteEventCard> {
                     ),
                   ),
 
-                // Badge (center)
-                if (widget.badgeText.isNotEmpty)
+                // Badge (center) – hidden for events hosted by current user
+                if (widget.badgeText.isNotEmpty &&
+                    widget.status != EventStatus.hostedByCurrentUser)
                   Expanded(
                     child: Center(
                       child: ClipRRect(
@@ -264,8 +273,13 @@ class _InviteEventCardState extends State<InviteEventCard> {
                 else
                   const Spacer(),
 
-                // Upload icon (right) - hide for ended and "Deadline Has Passed"
-                if (!widget.isEnded && widget.badgeText != "Deadline Has Passed")
+                // Upload icon (right)
+                // Hide for: ended, "Deadline Has Passed", attending (ticket generated),
+                // and events hosted by current user.
+                if (!widget.isEnded &&
+                    widget.badgeText != "Deadline Has Passed" &&
+                    widget.status != EventStatus.attending &&
+                    widget.status != EventStatus.hostedByCurrentUser)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(50),
                     child: BackdropFilter(
@@ -426,9 +440,9 @@ class _InviteEventCardState extends State<InviteEventCard> {
             ),
           if (banner != null)
             Transform.translate(
-              // Pull the card up slightly so it overlaps
-              // the orange banner (no black gap).
-              offset: const Offset(0, -16),
+              // Pull the card up so it overlaps the orange banner
+              // by roughly 10px as per design.
+              offset: const Offset(0, -14),
               child: card,
             )
           else
@@ -439,6 +453,8 @@ class _InviteEventCardState extends State<InviteEventCard> {
   }
 
   Widget _buildSingleButton() {
+    // For both "View request" and "View ticket" we use the same CTA style
+    // (no icon inside the button).
     if (widget.buttonLabel != null && widget.buttonLabel!.isNotEmpty) {
       return SizedBox(
         width: double.infinity,
@@ -522,10 +538,7 @@ class _InviteEventCardState extends State<InviteEventCard> {
         gradient: RadialGradient(
           center: const Alignment(0.499, 0),
           radius: 0.52,
-          colors: const [
-            Color(0xFFFF9028),
-            Color(0xFFFF5E00),
-          ],
+          colors: colors,
           stops: const [0.0, 1.0],
         ),
         border: Border.all(
@@ -533,9 +546,9 @@ class _InviteEventCardState extends State<InviteEventCard> {
           width: 2,
         ),
       ),
-      // Slightly taller so part of it sits under the card
-      // while still leaving a clear orange strip visible above.
-      height: 58,
+      // Orange banner behind the event card
+      // The card overlaps this by ~10px for the "peeking" effect.
+      height: 60,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

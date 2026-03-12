@@ -22,8 +22,13 @@ import 'package:text_code/HostManagement/mainScreen.dart';
 import 'package:text_code/core/services/event_request_service_host.dart';
 import 'package:text_code/core/utils/jwt_utils.dart';
 import 'package:text_code/core/services/secure_storage_service.dart';
-
+import 'package:text_code/login-signup/sign_up/booked_ticket.dart';
 import 'package:text_code/core/utils/image_url_helper.dart';
+import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
+import 'package:text_code/core/models/event_invitation.dart';
+import 'package:text_code/core/services/event_invitation_service.dart';
+import 'package:text_code/core/network/api_exception.dart';
+import 'package:text_code/core/services/ticket_service.dart';
 
 class HomePages extends StatefulWidget {
   const HomePages({super.key, this.showTabs = true, this.tabIndex, this.onTabChanged});
@@ -44,15 +49,85 @@ class _HomePagesState extends State<HomePages> {
   );
   final eventController = Get.put(EventController());
   final HomePageController homePageController = Get.put(HomePageController());
+  final UserTicketController userTicketController = Get.put(UserTicketController());
 
   final CapacityController capacityController = Get.put(CapacityController());
   final SecureStorageService _secureStorage = SecureStorageService();
   final EventRequestService _eventRequestService = EventRequestService();
+  final TicketService _ticketService = TicketService();
   int? _currentUserId;
   int selectedIndex = 0;
   
   // Cache for request statuses: eventId -> status
   final Map<int, String?> _requestStatusCache = {};
+
+  /// Extract event ID from my-tickets item (flat or nested under event).
+  int? _eventIdFromTicketData(Map<String, dynamic> ticketData) {
+    final id = ticketData['event_id'];
+    if (id != null) {
+      if (id is int) return id;
+      final parsed = int.tryParse(id.toString());
+      if (parsed != null) return parsed;
+    }
+    final event = ticketData['event'];
+    if (event is Map<String, dynamic>) {
+      final eid = event['id'];
+      if (eid != null) {
+        if (eid is int) return eid;
+        final parsed = int.tryParse(eid.toString());
+        if (parsed != null) return parsed;
+      }
+    }
+    return null;
+  }
+
+  /// Prefetch user's tickets from "my-tickets" API so Home page can
+  /// mark events as "You're going" when a ticket exists.
+  Future<void> _prefetchUserTickets() async {
+    try {
+      if (kDebugMode) {
+        print('Prefetching user tickets for Home page...');
+      }
+
+      final ticketsData = await _ticketService.getAllUserTickets();
+
+      if (kDebugMode) {
+        print('Prefetched ${ticketsData.length} tickets');
+      }
+
+      // Clear existing tickets before inserting fresh ones
+      userTicketController.tickets.clear();
+
+      for (final ticketData in ticketsData) {
+        if (ticketData is! Map<String, dynamic>) continue;
+        final eventId = _eventIdFromTicketData(ticketData);
+        if (eventId == null) continue;
+
+        // We only need eventId here to drive "You're going" state on Home.
+        // Other fields are left empty; BookedTicket screen will refetch
+        // and populate full ticket details when user opens My tickets.
+        final ticket = UserTicket(
+          title: '',
+          date: '',
+          location: '',
+          code: '',
+          eventImage: '',
+          eventId: eventId,
+        );
+        userTicketController.addTicket(ticket);
+      }
+
+      if (kDebugMode) {
+        print('Home page ticket prefetch completed. Tickets in controller: ${userTicketController.tickets.length}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error prefetching tickets for Home page: $e');
+      }
+      // Silent fail is fine here; Home page will just not show "You\'re going"
+      // until tickets are fetched elsewhere.
+    }
+  }
   
   void imageTap() {
     print("Image tapped!");
@@ -73,6 +148,16 @@ class _HomePagesState extends State<HomePages> {
     } catch (e) {
       _requestStatusCache[eventId] = null;
       return null;
+    }
+  }
+
+  /// Check if there is a ticket for this event in the user's tickets
+  bool _hasTicketForEvent(int eventId) {
+    try {
+      return userTicketController.tickets
+          .any((ticket) => ticket.eventId != null && ticket.eventId == eventId);
+    } catch (_) {
+      return false;
     }
   }
 
@@ -309,6 +394,10 @@ class _HomePagesState extends State<HomePages> {
       capacityController.guestPays.value =
           double.tryParse(capacityController.ticketPriceController.text) ?? 0.0;
     });
+
+    // On app/home open, prefetch "my-tickets" so events with tickets
+    // can immediately show the "You're Going!" state on the Home page.
+    _prefetchUserTickets();
   }
 
   /// Helper function to build image from network URL or asset
@@ -505,9 +594,26 @@ class _HomePagesState extends State<HomePages> {
                       print('Current User - ID: $currentUserId, Phone: "$currentUserPhoneNumber"');
                     }
                     
-                    // Sort events: User's hosted events first (by latest ID), then others by latest event ID
-                    final sortedEvents = List<Event>.from(homePageController.events);
-                    sortedEvents.sort((a, b) {
+                    // Filter events based on invitation status:
+                    // - Show events with invitation status "accepted" or "pending"
+                    // - Hide events with invitation status "declined"
+                    // - Show all events that don't have an invitation
+                    final allEvents = List<Event>.from(homePageController.events);
+                    final filteredEvents = allEvents.where((event) {
+                      // Check if this event has an invitation
+                      for (final invitation in homePageController.invitations) {
+                        if (invitation.eventId == event.id) {
+                          final invStatus = invitation.status.toLowerCase();
+                          // Only show if status is "accepted" or "pending" or "expired", hide "declined"
+                          return invStatus == 'accepted' || invStatus == 'pending' || invStatus == 'expired';
+                        }
+                      }
+                      // Show events without invitations (normal events)
+                      return true;
+                    }).toList();
+                    
+                    // Sort filtered events: User's hosted events first (by latest ID), then others by latest event ID
+                    filteredEvents.sort((a, b) {
                       final aIsHost = _isUserHostingEvent(a, currentUserId, currentUserPhoneNumber);
                       final bIsHost = _isUserHostingEvent(b, currentUserId, currentUserPhoneNumber);
                       
@@ -525,7 +631,7 @@ class _HomePagesState extends State<HomePages> {
                     });
                     
                     return Column(
-                      children: sortedEvents.map((event) {
+                      children: filteredEvents.map((event) {
                         return FutureBuilder<String?>(
                           future: _getRequestStatus(event.id),
                           builder: (context, requestStatusSnapshot) {
@@ -567,29 +673,110 @@ class _HomePagesState extends State<HomePages> {
     String? requestStatus,
   ) {
     // Check if current user is hosting this event
-    final bool isUserHost = _isUserHostingEvent(event, currentUserId, currentUserPhoneNumber);
-    
-    // Determine badge text based on original event status (DON'T change badge)
+    final bool isUserHost =
+        _isUserHostingEvent(event, currentUserId, currentUserPhoneNumber);
+
+    // Normalized status string from API (e.g. 'pending', 'expired', 'accepted').
+    // Prefer status from /api/events/my-invitations when available so home
+    // page cards mirror invitation states (pending, expired, etc.).
+    String statusLower = event.status.toLowerCase();
+    for (final invitation in homePageController.invitations) {
+      if (invitation.eventId == event.id) {
+        statusLower = invitation.status.toLowerCase();
+        break;
+      }
+    }
+
+    // Determine base state flags for this event and user
     final bool hasEnded = event.hasEnded;
-    String badgeText = isUserHost && !hasEnded 
-        ? "Your Event is Live!" 
-        : hasEnded 
-            ? "Event Has Ended" 
-            : "New Event";
+    final bool isExpired = statusLower == 'expired';
+    // Treat expired invitations as ended for UI/interaction purposes
+    final bool isEnded = hasEnded || isExpired;
+
+    // Check if user is already marked as going/attending.
+    // IMPORTANT: do NOT treat plain "accepted" as going – user still needs
+    // to confirm attendance from the event detail page.
+    // However, if a ticket exists for this event in the user's ticket list,
+    // always treat it as a "going" state.
+    final bool hasTicket = _hasTicketForEvent(event.id);
+    final bool isGoingState =
+        hasTicket ||
+        statusLower.contains('going') ||
+        statusLower.contains('attending');
+
+    // Only treat explicit going/attending as "ticket generated" state.
+    final bool isAttendingEvent =
+        !isEnded && isGoingState && !isUserHost;
+
+    // Check if this event has an invitation (from my-invitations API)
+    EventInvitation? matchingInvitation;
+    for (final invitation in homePageController.invitations) {
+      if (invitation.eventId == event.id) {
+        matchingInvitation = invitation;
+        break;
+      }
+    }
     
-    final bool isEnded = hasEnded;
+    final bool hasInvitation = matchingInvitation != null;
+    final String invitationStatus = matchingInvitation?.status.toLowerCase() ?? '';
     
-    // Check if request is accepted
-    final bool isRequestAccepted = (requestStatus?.toLowerCase() ?? '').contains('accepted') ||
-        event.status.toLowerCase().contains('accepted') ||
-        event.status.toLowerCase().contains('going') ||
-        event.status.toLowerCase().contains('attending');
+    // Normalized request status from event-requests API (for non-invited events)
+    final String requestStatusLower = (requestStatus ?? '').toLowerCase();
+    final bool isRequestPending = requestStatusLower == 'pending';
+    final bool isRequestAccepted = requestStatusLower == 'accepted';
     
-    // Show two buttons only when:
-    // - Event hasn't ended AND
-    // - Request is accepted
-    final bool shouldShowTwoButtons = !isEnded && isRequestAccepted && !isUserHost;
+    // Pending or accepted invitation from "my invitations" API
+    final bool isInvitationEvent = hasInvitation && 
+        (invitationStatus == 'pending' || invitationStatus == 'accepted') &&
+        !isEnded && 
+        !isUserHost && 
+        !isAttendingEvent;
+
+    // Accepted normal request (no invitation) – user still needs to confirm
+    // attendance from the event detail page. On the Home page we should show
+    // "New Event" badge with Going / Not Going buttons until a ticket exists.
+    final bool isAcceptedRequestEvent = !hasInvitation &&
+        !isEnded &&
+        !isUserHost &&
+        !isAttendingEvent &&
+        isRequestAccepted;
+
+    // Determine badge text based on original event status
+    String badgeText;
+    if (isExpired) {
+      // Invitation deadline has passed
+      badgeText = "Deadline Has Passed";
+    } else if (isUserHost && !hasEnded) {
+      // Host's own upcoming / live event
+      badgeText = "Your Event is Live!";
+    } else if (isInvitationEvent) {
+      // New invite from /my-invitations API (both pending and accepted show "New Invite")
+      badgeText = "New Invite";
+    } else if (!hasEnded && isAttendingEvent) {
+      // Events where the user's ticket has been generated / they are going
+      badgeText = "You're Going!";
+    } else if (hasEnded) {
+      badgeText = "Event Has Ended";
+    } else {
+      badgeText = "New Event";
+    }
+
+    // Two-button layout (Going / Not Going) is shown for:
+    // - Invitation events (pending or accepted)
+    // - Normal events where the join request is accepted but ticket is not yet generated
+    final bool shouldShowTwoButtons = isInvitationEvent || isAcceptedRequestEvent;
     
+    // Compute star/badge icon once so Home page and EventDetail use the same icon
+    final String starImagePath = isExpired
+        ? "assets/icons/Group 1 (4).png" // Deadline Has Passed
+        : hasEnded
+            ? "assets/icons/Group 1 (3).png" // Event ended
+            : isInvitationEvent
+                ? "assets/icons/Group 1 (6).png" // New invite
+                : isAttendingEvent
+                    ? "assets/icons/Group 1 (5).png" // You're Going
+                    : "assets/icons/Group 1 (2).png"; // Default "New event"
+
     // Get cover images or use placeholder
     final List<String> imageUrls = event.coverImages.isNotEmpty
         ? event.coverImages.map((url) => imageUrl(url)).toList()
@@ -613,9 +800,12 @@ class _HomePagesState extends State<HomePages> {
     String buttonText = "Send Request";
     if (isUserHost) {
       buttonText = "View Request";
-    } else if (requestStatus?.toLowerCase() == 'pending') {
+    } else if (isRequestPending) {
       // Change button to show "Requested to join" when request is pending
       buttonText = "Requested to join";
+    } else if (isAttendingEvent) {
+      // For going events, show "View ticket"
+      buttonText = "View ticket";
     }
 
     return InviteEventCard(
@@ -624,20 +814,36 @@ class _HomePagesState extends State<HomePages> {
       title: event.title,
       dateLocation: dateLocation,
       hostName: event.host.name,
-      starImagePath: "assets/icons/Group 1 (2).png",
+      status: isUserHost
+          ? EventStatus.hostedByCurrentUser
+          : isAttendingEvent
+              ? EventStatus.attending
+              : isEnded
+                  ? EventStatus.ended
+                  : EventStatus.newEvent,
+      // Badge icons:
+      // - Deadline Has Passed: Group 1 (4)
+      // - Event ended (non-expired): Group 1 (3)
+      // - New invite: Group 1 (6)
+      // - Going (ticket generated): Group 1 (5)
+      // - Default / New event: Group 1 (2)
+      starImagePath: starImagePath,
       isEnded: isEnded,
-      imagePath: isEnded
-          ? ''
-          : 'assets/images/button/Frame 19976 (4).png',
+      imagePath: isEnded ? '' : 'assets/images/button/Frame 19976 (4).png',
+      // For expired invites (treated as ended), hide CTA button.
       buttonLabel: isEnded ? null : buttonText,
       buttonVariant: LoopinButtonVariant.primary,
       showButton: !isEnded,
       showTwoButtons: shouldShowTwoButtons,
-      isPaid: event.isPaid,
-      price: event.isPaid && event.ticketPrice != null
-          ? event.ticketPrice
-          : null,
-      onUploadTap: () {
+      // Use same CTA style for "View request" and "View ticket" (no icon inside).
+      isViewTicketButton: false,
+      // For expired invitations, hide price tag
+      isPaid: isExpired ? false : event.isPaid,
+      price: isExpired 
+          ? null 
+          : (event.isPaid && event.ticketPrice != null ? event.ticketPrice : null),
+      // Hide share icon for expired invitations
+      onUploadTap: isExpired ? null : () {
         _shareEvent(event);
       },
       onTap: () {
@@ -663,6 +869,16 @@ class _HomePagesState extends State<HomePages> {
               ),
             ),
           );
+        } else if (isAttendingEvent) {
+          // For going events, open the tickets screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BookedTicket(
+                showTabs: true,
+              ),
+            ),
+          );
         } else {
           // Navigate to event detail to view the pending request or event details
           Navigator.push(
@@ -680,9 +896,12 @@ class _HomePagesState extends State<HomePages> {
                 fullAddress: event.location.address,
                 aboutEvent: event.description.isNotEmpty ? event.description : 'Event details coming soon',
                 badgeText: badgeText,
+                starImagePath: starImagePath,
                 attendeesCount: event.goingCount,
                 attendeeImages: [],
-                isGoing: isRequestAccepted,
+                // Mark as "going" on detail page only when the user is
+                // actually in a going/attending state, not just accepted.
+                isGoing: isAttendingEvent,
                 price: event.isPaid && event.ticketPrice != null ? event.ticketPrice : null,
               ),
             ),
@@ -690,7 +909,8 @@ class _HomePagesState extends State<HomePages> {
         }
       },
       onFirstButtonTap: () {
-        // "Going" button - Confirm attendance and generate ticket
+        // "Going" button - Navigate to EventDetail page
+        // EventDetail will call confirm-attendance API which accepts invitation if pending
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -706,18 +926,104 @@ class _HomePagesState extends State<HomePages> {
               fullAddress: event.location.address,
               aboutEvent: event.description.isNotEmpty ? event.description : 'Event details coming soon',
               badgeText: badgeText,
+              starImagePath: starImagePath,
               attendeesCount: event.goingCount,
               attendeeImages: [],
-              isGoing: true,
+              isGoing: false,
               price: event.isPaid && event.ticketPrice != null ? event.ticketPrice : null,
             ),
           ),
         );
       },
-      onSecondButtonTap: () {
-        // "Not Going" button - Decline invitation/request
-        print("Not Going button tapped for ${event.title}");
-        // TODO: Implement decline invitation API call
+      onSecondButtonTap: () async {
+        // "Not Going" button - Decline invitation
+        if (matchingInvitation == null) {
+          if (kDebugMode) {
+            print('No invitation found for event ${event.id}');
+          }
+          return;
+        }
+
+        try {
+          if (kDebugMode) {
+            print('Declining invitation ${matchingInvitation!.inviteId} for event ${event.id}');
+          }
+
+          // Show loading dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+
+          // Decline invitation via API
+          final EventInvitationService invitationService = EventInvitationService();
+          await invitationService.respondToInvitation(
+            inviteId: matchingInvitation!.inviteId,
+            response: 'declined',
+            message: 'I cannot attend this event.',
+          );
+
+          // Close loading dialog
+          if (context.mounted) Navigator.of(context).pop();
+
+          // Remove invitation from local list (this will hide the event from Home Page)
+          homePageController.invitations.removeWhere(
+            (inv) => inv.inviteId == matchingInvitation!.inviteId,
+          );
+
+          // Refresh events to update UI
+          homePageController.refreshEvents();
+
+          if (kDebugMode) {
+            print('Invitation declined successfully');
+          }
+
+          // Show success message
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Invitation declined'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } catch (e) {
+          // Close loading dialog
+          if (context.mounted) Navigator.of(context).pop();
+
+          if (kDebugMode) {
+            print('Error declining invitation: $e');
+          }
+
+          // Extract meaningful error message
+          String errorMessage = 'Failed to decline invitation. Please try again.';
+          
+          if (e is ApiException) {
+            errorMessage = e.message;
+          } else {
+            final errorString = e.toString();
+            if (errorString.startsWith('ApiException: ')) {
+              errorMessage = errorString.substring('ApiException: '.length);
+            }
+          }
+
+          // Show error message
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
       },
     );
   }
@@ -829,9 +1135,10 @@ class _HomePagesState extends State<HomePages> {
                     child: Obx(() {
                       return Padding(
                         padding: const EdgeInsets.all(8.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: cityController.cities.map((city) {
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: cityController.cities.map((city) {
                             bool isSelected =
                                 city["name"] ==
                                 cityController.selectedCity.value;
@@ -850,11 +1157,14 @@ class _HomePagesState extends State<HomePages> {
                                 ),
                                 title: Text(
                                   city["name"]!,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w600,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFFFFF),
+                                    fontFamily: "Clash Display",
+                                    fontSize: 14,
+                                    fontStyle: FontStyle.normal,
+                                    fontWeight: FontWeight.w400,
+                                    height: 8.204 / 14, // line-height 8.204px
+                                    letterSpacing: -0.28,
                                   ),
                                 ),
                                 trailing: isSelected
@@ -871,6 +1181,7 @@ class _HomePagesState extends State<HomePages> {
                               ),
                             );
                           }).toList(),
+                          ),
                         ),
                       );
                     }),

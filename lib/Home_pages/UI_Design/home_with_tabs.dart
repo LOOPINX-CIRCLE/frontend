@@ -147,6 +147,7 @@ class _HomeWithTabsState extends State<HomeWithTabs> {
                     child: Obx(() {
                       return Padding(
                         padding: const EdgeInsets.all(8.0),
+                        child: SingleChildScrollView(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: cityController.cities.map((city) {
@@ -165,11 +166,14 @@ class _HomeWithTabsState extends State<HomeWithTabs> {
                                 ),
                                 title: Text(
                                   city["name"]!,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w600,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFFFFF),
+                                    fontFamily: "Clash Display",
+                                    fontSize: 14,
+                                    fontStyle: FontStyle.normal,
+                                    fontWeight: FontWeight.w400,
+                                    height: 8.204 / 14, // line-height 8.204px
+                                    letterSpacing: -0.28,
                                   ),
                                 ),
                                 trailing: isSelected
@@ -186,6 +190,7 @@ class _HomeWithTabsState extends State<HomeWithTabs> {
                               ),
                             );
                           }).toList(),
+                          ),
                         ),
                       );
                     }),
