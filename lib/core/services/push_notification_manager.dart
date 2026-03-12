@@ -29,7 +29,9 @@ class PushNotificationManager {
   }) async {
     try {
       if (kDebugMode) {
-        print('🔔 Initializing push notifications for user');
+        print('═════════════════════════════════════════════════════════');
+        print('🔔 INITIALIZING PUSH NOTIFICATIONS FOR USER');
+        print('═════════════════════════════════════════════════════════');
       }
 
       // ⚠️ Check if App ID is still placeholder
@@ -49,6 +51,12 @@ class PushNotificationManager {
         onNotificationTap: onNotificationTap,
       );
 
+      if (kDebugMode) {
+        print('Step 1 Complete: OneSignal initialization');
+        print('   ➜ Player ID: $playerId');
+        print('   ➜ Player ID is null? ${playerId == null}');
+      }
+
       if (playerId == null || playerId.isEmpty) {
         if (kDebugMode) {
           print('❌ OneSignal player ID is null or empty');
@@ -65,6 +73,10 @@ class PushNotificationManager {
 
       // Step 3: Register device with backend
       await _registerDeviceWithBackend(playerId);
+      
+      if (kDebugMode) {
+        print('Step 3 Complete: Backend registration attempted');
+      }
 
       if (kDebugMode) {
         print('═════════════════════════════════════════════════════════');
@@ -91,13 +103,16 @@ class PushNotificationManager {
   Future<void> _registerDeviceWithBackend(String playerId) async {
     try {
       if (kDebugMode) {
-        print('🔔 Registering device with backend...');
-        print('   📱 Player ID: $playerId');
+        print('═══════════════════════════════════════════════════════════');
+        print('📱 REGISTERING DEVICE WITH BACKEND');
+        print('═══════════════════════════════════════════════════════════');
+        print('   🔑 Player ID: $playerId');
       }
 
       final platform = _oneSignal.getPlatform(); // 'ios' or 'android'
 
       if (kDebugMode) {
+        print('   🔌 Platform: $platform');
         print('   🔌 Platform: $platform');
       }
 
@@ -106,18 +121,22 @@ class PushNotificationManager {
         platform: platform,
       );
 
+      if (kDebugMode) {
+        print('   📤 Backend Response: $success');
+      }
+
       if (success['success'] == true) {
         if (kDebugMode) {
-          print(' ✅ Backend registration successful');
+          print('   ✅ BACKEND REGISTRATION SUCCESSFUL! Device registered with user account');
         }
       } else {
         if (kDebugMode) {
-          print('❌ Backend registration failed');
+          print('   ❌ BACKEND REGISTRATION FAILED: ${success['message'] ?? success['error'] ?? 'Unknown error'}');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Error registering device with backend: $e');
+        print('   ❌ EXCEPTION: Error registering device with backend: $e');
       }
     }
   }

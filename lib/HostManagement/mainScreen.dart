@@ -25,6 +25,7 @@ class MainScreen extends StatefulWidget {
   final int? eventId; // Add event ID for fetching real-time request data
   final DateTime? eventDateTime; // Add event date/time for check-in validation
   final String eventStatus; // Add event status for bank account button
+  final String? payoutStatus; // Payout status from event
 
   const MainScreen({
     super.key,
@@ -37,13 +38,14 @@ class MainScreen extends StatefulWidget {
     this.eventId,
     this.eventDateTime,
     this.eventStatus = 'planned',
+    this.payoutStatus,
   });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   String? selectedRsvpOption; // Track selected RSVP option
   final EventRequestService _eventRequestService = EventRequestService();
   final InvitationService _invitationService = InvitationService();
@@ -66,6 +68,27 @@ class _MainScreenState extends State<MainScreen> {
     _fetchActualRequestCount();
     _fetchActualInvitedCount();
     _fetchActualCheckInCount();
+    
+    // Add lifecycle observer to refresh when app comes back to foreground
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void dispose() {
+    // Remove lifecycle observer when widget is disposed
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh status when app comes back to foreground
+    if (state == AppLifecycleState.resumed) {
+      if (kDebugMode) {
+        print('📊 Dashboard resumed - refreshing all status counts');
+      }
+      _refreshAllCounts();
+    }
   }
 
   /// Fetch the actual pending request count from the API
@@ -350,6 +373,7 @@ class _MainScreenState extends State<MainScreen> {
               eventPrice: widget.eventPrice,
               isCheckInActive: selectedRsvpOption == '48 Hours',
               eventStatus: widget.eventStatus,
+              payoutStatus: widget.payoutStatus,
               onRefreshCounts: _refreshAllCounts,
             );
           },

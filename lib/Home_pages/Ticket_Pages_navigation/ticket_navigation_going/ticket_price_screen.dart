@@ -8,7 +8,6 @@ import 'package:text_code/login-signup/Controller/user_controller.dart';
 import 'package:text_code/core/services/payment_service.dart';
 import 'package:text_code/core/services/event_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
-
 class TicketPriceScreen extends StatefulWidget {
   const TicketPriceScreen({super.key});
 

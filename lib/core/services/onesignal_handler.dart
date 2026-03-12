@@ -27,12 +27,14 @@ class OneSignalHandler {
       _notificationTapHandler = onNotificationTap;
 
       if (kDebugMode) {
+        print('🔔 OneSignalHandler: Initializing OneSignal with App ID: $appId');
       }
 
       // Initialize OneSignal with App ID
       OneSignal.initialize(appId);
       
       if (kDebugMode) {
+        print('✅ OneSignal initialized successfully');
       }
       
       // Request notification permissions
@@ -40,8 +42,12 @@ class OneSignalHandler {
 
       // Give OneSignal time to initialize subscription
       if (kDebugMode) {
+        print('⏳ Waiting for OneSignal to initialize subscription...');
       }
       await Future.delayed(const Duration(milliseconds: 2000));
+      if (kDebugMode) {
+        print('✅ OneSignal subscription initialization complete');
+      }
 
       // Get player ID using the official method from documentation
       final playerId = await getPlayerIdFromSdk();
@@ -49,7 +55,10 @@ class OneSignalHandler {
 
       if (kDebugMode) {
         if (_playerIdCache == null) {
+          print('❌ Player ID is null - checking diagnostics');
           _printDiagnostics();
+        } else {
+          print('✅ Player ID obtained: $_playerIdCache');
         }
       }
 
@@ -83,6 +92,7 @@ class OneSignalHandler {
   Future<String?> getPlayerIdFromSdk() async {
     try {
       if (kDebugMode) {
+        print('🔍 Attempting to get Player ID from OneSignal SDK...');
       }
       
       final maxWaitTime = 8000; // 8 seconds total wait

@@ -25,6 +25,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   late VideoPlayerController _controller;
+  bool _shouldShowVideo = false;
 
   @override
   void initState() {
@@ -33,6 +34,62 @@ class _SplashScreenState extends State<SplashScreen> {
     // Hide system UI for a full-screen experience
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
+    // Check login status and first launch before initializing video
+    _checkLoginAndFirstLaunch();
+  }
+
+  /// Check if user is logged in and if it's first launch
+  Future<void> _checkLoginAndFirstLaunch() async {
+    try {
+      final secureStorage = SecureStorageService();
+      final authService = AuthService();
+
+      // Delay to ensure splash screen is visible
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Check if user is already logged in
+      final token = await authService.getStoredToken();
+      final isUserLoggedIn = token != null && token.isNotEmpty;
+
+      if (isUserLoggedIn) {
+        // User is logged in - go to home
+        if (mounted) {
+          Get.offAllNamed('/home');
+        }
+        return;
+      }
+
+      // User is NOT logged in
+      // Check if this is the very first launch (never logged in before)
+      final firstLaunch = await secureStorage.isFirstLaunch();
+
+      // ✅ ALWAYS show video for non-logged-in users (shows every time they logout)
+      if (mounted) {
+        setState(() {
+          _shouldShowVideo = true;
+        });
+        
+        // Mark as no longer first launch (but show video anyway)
+        if (firstLaunch) {
+          await secureStorage.markFirstLaunchComplete();
+        }
+        
+        // Initialize video
+        _initializeVideo();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error checking login status: $e');
+      }
+      // Default to showing login screen on error
+      if (mounted) {
+        Get.to(() => const MobileNo(), transition: Transition.fadeIn);
+      }
+    }
+  }
+
+  /// Initialize video player for splash screen
+  void _initializeVideo() {
     // Fix: Use correct case-sensitive filename (Splash.mp4 not splash.mp4)
     _controller = VideoPlayerController.asset('assets/video/Splash.mp4')
       ..initialize().then((_) {
@@ -46,13 +103,13 @@ class _SplashScreenState extends State<SplashScreen> {
           _controller.play();
 
           // And ONLY NOW, start the timer to navigate away.
-          _navigateToHome();
+          _navigateAfterVideo();
         }
       }).catchError((error) {
         // Handle video loading errors - navigate immediately if video fails
         print('Error loading splash video: $error');
         if (mounted) {
-          _navigateToHome();
+          _navigateAfterVideo();
         }
       });
 
@@ -60,12 +117,16 @@ class _SplashScreenState extends State<SplashScreen> {
     _controller.setVolume(0.0);
   }
 
-  void _navigateToHome() async {
+  void _navigateAfterVideo() async {
     // Wait for a duration. 4 seconds should be enough for your video.
     await Future.delayed(const Duration(seconds: 4));
 
     // Check if the widget is still in the tree before navigating
     if (mounted) {
+      // Mark first launch as complete
+      final secureStorage = SecureStorageService();
+      await secureStorage.markFirstLaunchComplete();
+
       // First check for pending UPI payment (app might have been killed during payment)
       final hasPendingPayment = await _checkPendingPayment();
       if (hasPendingPayment) {
@@ -73,7 +134,7 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // Always navigate to mobile number page (skip auto-login)
+      // Navigate to mobile number page
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
@@ -238,54 +299,12 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  Future<void> _checkAutoLogin() async {
-    try {
-      // Add a small delay to ensure services are initialized
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      final authService = AuthService();
-      final token = await authService.getStoredToken();
-      
-      if (mounted) {
-        if (token != null && token.isNotEmpty) {
-          // Token exists, go to home
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          // No token, go to login/signup - use direct navigation since route might not exist
-          Navigator.pushReplacement(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => MobileNo(),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-              transitionDuration: const Duration(milliseconds: 500),
-            ),
-          );
-        }
-      }
-    } catch (error) {
-      print('Error during auto login check: $error');
-      // Fallback navigation on error - always go to mobile number page
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => MobileNo(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
-      }
-    }
-  }
-
   @override
   void dispose() {
-    // Dispose the controller to free up resources
-    _controller.dispose();
+    // Dispose the controller only if it was initialized
+    if (_shouldShowVideo) {
+      _controller.dispose();
+    }
     // Restore system UI when leaving the splash screen
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
@@ -296,11 +315,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Always show black screen with loading indicator while splashscreen is active
+    // Navigation happens in initState based on login & first launch status
     return Scaffold(
-      backgroundColor: Colors.black, // Match the video's background
+      backgroundColor: Colors.black,
       body: Center(
-        // We wait for the controller to be initialized before showing the video
-        child: _controller.value.isInitialized
+        child: _shouldShowVideo && _controller.value.isInitialized
             ? SizedBox.expand(
                 child: FittedBox(
                   fit: BoxFit.cover,
@@ -311,11 +331,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ),
               )
-            // While loading, show a loading indicator instead of just black screen
-            : const Center(
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
+            : CircularProgressIndicator(
+                color: Colors.white.withOpacity(0.5),
               ),
       ),
     );

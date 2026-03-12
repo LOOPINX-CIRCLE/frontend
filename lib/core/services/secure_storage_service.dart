@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 /// Uses flutter_secure_storage which provides encrypted storage
 class SecureStorageService {
   static const String _tokenKey = 'auth_token';
+  static const String _firstLaunchKey = 'is_first_launch';
   static const String _pendingPaymentOrderIdKey = 'pending_payment_order_id';
   static const String _pendingPaymentEventIdKey = 'pending_payment_event_id';
   static const String _pendingPaymentTimestampKey = 'pending_payment_timestamp';
@@ -61,6 +62,33 @@ class SecureStorageService {
   Future<bool> hasToken() async {
     final token = await getToken();
     return token != null && token.isNotEmpty;
+  }
+
+  // ============ First Launch Flag Methods ============
+  // Used to show intro video only on first app launch
+
+  /// Check if this is the first time the app is being launched
+  Future<bool> isFirstLaunch() async {
+    try {
+      final value = await _storage.read(key: _firstLaunchKey);
+      return value == null; // null means first launch
+    } catch (e) {
+      if (kDebugMode) {
+      }
+      return true; // Assume first launch on error
+    }
+  }
+
+  /// Mark that the app has been launched (after first launch)
+  Future<void> markFirstLaunchComplete() async {
+    try {
+      await _storage.write(key: _firstLaunchKey, value: 'false');
+      if (kDebugMode) {
+      }
+    } catch (e) {
+      if (kDebugMode) {
+      }
+    }
   }
 
   // ============ Pending Payment Methods ============
