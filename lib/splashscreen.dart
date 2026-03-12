@@ -193,6 +193,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (status == 'paid') {
         // Payment was successful! Fetch ticket and navigate to success
+        //hello
         if (kDebugMode) {
           print('Payment was successful! Fetching ticket...');
         }
