@@ -6,6 +6,7 @@ import 'package:text_code/login-signup/sign_up/name_page.dart';
 import 'package:pinput/pinput.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/core/services/auth_service.dart';
+import 'package:text_code/core/services/push_notification_manager.dart';
 import 'package:text_code/core/network/api_exception.dart';
 import 'package:text_code/Reusable/navigation_bar.dart';
 import 'package:text_code/waitHomePage/waitHome.dart';
@@ -102,6 +103,9 @@ class _OTPPageState extends State<OTPPage> {
           if (kDebugMode) {
             print('Navigating to home page - user is verified and profile complete');
           }
+          // ✅ Initialize push notifications before navigating
+          _initializePushNotifications();
+          
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
@@ -112,6 +116,9 @@ class _OTPPageState extends State<OTPPage> {
           if (kDebugMode) {
             print('User is NOT active (in vetting queue). Navigating to WaitHome.');
           }
+          // ✅ Initialize push notifications even for pending users
+          _initializePushNotifications();
+          
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const WaitHome()),
@@ -392,6 +399,40 @@ class _OTPPageState extends State<OTPPage> {
         ),
       ),
     );
+  }
+
+  /// Initialize push notifications after successful OTP verification
+  void _initializePushNotifications() {
+    try {
+      if (kDebugMode) {
+        print('🔔 Initializing push notifications after OTP verification...');
+      }
+      
+      final pushManager = PushNotificationManager();
+      
+      // Initialize push notifications (fire-and-forget - don't block navigation)
+      pushManager.initializeForUser().then((success) {
+        if (success) {
+          if (kDebugMode) {
+            print('✅ Push notifications initialized successfully');
+          }
+        } else {
+          if (kDebugMode) {
+            print('⚠️ Push notifications failed to initialize (non-blocking)');
+          }
+        }
+      }).catchError((e) {
+        if (kDebugMode) {
+          print('❌ Error initializing push notifications: $e');
+        }
+        // Don't block app if push notifications fail
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Exception in push notification initialization: $e');
+      }
+      // Don't block navigation if push notifications fail
+    }
   }
 
   //   Widget _buildContinueButton(bool isActive) {

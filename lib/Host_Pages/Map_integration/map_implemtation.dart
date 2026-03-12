@@ -7,7 +7,6 @@ import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
 import 'package:text_code/Host_Pages/Map_integration/api_services.dart';
 import 'package:text_code/core/config/web_config.dart';
 import 'package:text_code/core/services/web_places_service.dart';
-import 'package:text_code/core/services/web_location_service.dart';
 import 'package:text_code/core/utils/image_utils.dart';
 
 class MapController extends StatefulWidget {

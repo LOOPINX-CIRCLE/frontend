@@ -866,6 +866,7 @@ class _HomePagesState extends State<HomePages> {
                 checkInCount: 0,
                 eventId: event.id,
                 eventStatus: event.status,
+                payoutStatus: event.payoutStatus,
               ),
             ),
           );

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+﻿
 import 'package:text_code/core/models/event_request.dart';
 import 'package:text_code/core/models/requester_profile.dart';
 import 'package:text_code/core/network/api_client.dart';
@@ -282,10 +282,13 @@ class EventRequestService {
   /// Constructs a full shareable URL from a path
   String _buildFullShareUrl(String urlOrPath) {
     if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
-      // Already a full URL - replace domain if needed
+      // Already a full URL - replace domain variations if needed
       if (urlOrPath.contains('loopinsocial.in')) {
-        return urlOrPath.replaceAll('https://loopinsocial.in', 'https://invite.loopinsocial.in')
-                        .replaceAll('http://loopinsocial.in', 'https://invite.loopinsocial.in');
+        return urlOrPath
+            .replaceAll('https://app.loopinsocial.in', 'https://invite.loopinsocial.in')
+            .replaceAll('http://app.loopinsocial.in', 'https://invite.loopinsocial.in')
+            .replaceAll('https://loopinsocial.in', 'https://invite.loopinsocial.in')
+            .replaceAll('http://loopinsocial.in', 'https://invite.loopinsocial.in');
       }
       return urlOrPath;
     }

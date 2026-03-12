@@ -775,6 +775,41 @@ class _ProfilePageState extends State<ProfilePage> {
     ));
   }
 
+  /// Deactivate push notification device in the background (fire-and-forget)
+  /// This runs asynchronously without blocking the logout process
+  void _deactivateDeviceInBackground() {
+    // Fire-and-forget: don't await, don't block UI
+    _performDeviceDeactivation();
+  }
+
+  /// Perform device deactivation without blocking logout
+  Future<void> _performDeviceDeactivation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final playerId = prefs.getString('onesignal_player_id');
+      
+      if (playerId != null && playerId.isNotEmpty) {
+        if (kDebugMode) {
+          print('📱 Deactivating push notification device in background...');
+        }
+        final notificationService = NotificationDeviceService();
+        await notificationService.deactivateDevice(oneSignalPlayerId: playerId);
+        
+        // Clear stored player ID
+        await prefs.remove('onesignal_player_id');
+        
+        if (kDebugMode) {
+          print('✅ Device deactivated successfully in background');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ Background deactivation failed (non-blocking): $e');
+      }
+      // Don't throw - this is fire-and-forget
+    }
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -801,43 +836,26 @@ class _ProfilePageState extends State<ProfilePage> {
               // Dismiss the dialog
               Navigator.pop(context);
               
+              // ✅ Log out immediately (don't wait for API calls)
               try {
-                // Deactivate device for push notifications
-                final prefs = await SharedPreferences.getInstance();
-                final playerId = prefs.getString('onesignal_player_id');
-                
-                if (playerId != null && playerId.isNotEmpty) {
-                  if (kDebugMode) {
-                    print('📱 Deactivating push notification device...');
-                  }
-                  final notificationService = NotificationDeviceService();
-                  await notificationService.deactivateDevice(oneSignalPlayerId: playerId);
-                }
-                
-                // Clear stored player ID
-                await prefs.remove('onesignal_player_id');
-                
-                // Clear auth token
+                // Clear auth token immediately
                 final authService = AuthService();
                 await authService.logout();
                 
                 if (kDebugMode) {
-                  print('✅ Device deactivated and user logged out');
+                  print('✅ User logged out immediately');
                 }
-                
-                // Navigate to phone number page
-                // Adjust route name based on your app's navigation
-                Get.offAllNamed('/login'); // or your phone number page route
-                
               } catch (e) {
                 if (kDebugMode) {
-                  print('❌ Error during logout: $e');
+                  print('❌ Error clearing token: $e');
                 }
-                // Still proceed with logout even if deactivation fails
-                final authService = AuthService();
-                await authService.logout();
-                Get.offAllNamed('/login');
               }
+              
+              // ✅ Deactivate device in background (don't block logout UI)
+              _deactivateDeviceInBackground();
+              
+              // Navigate to splash screen which will route to login
+              Get.offAllNamed('/');
             },
             child: Text(
               "Log out",

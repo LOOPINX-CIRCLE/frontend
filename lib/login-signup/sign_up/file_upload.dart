@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:text_code/login-signup/Controller/user_controller.dart';
 import 'package:text_code/core/services/auth_service.dart';
 import 'package:text_code/core/network/api_exception.dart';
+import 'package:text_code/core/services/push_notification_manager.dart';
 import 'package:text_code/waitHomePage/waitHome.dart';
 
 class PhotoUploadScreen extends StatefulWidget {
@@ -314,11 +315,17 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
 
         // Navigate based on is_active status
         if (isActive) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
-        );
+          // ✅ Initialize push notifications after successful profile completion
+          _initializePushNotifications();
+          
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const BottomBar(initialIndex: 0)),
+          );
         } else {
+          // ✅ Initialize push notifications even if user is pending verification
+          _initializePushNotifications();
+          
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const WaitHome()),
@@ -631,5 +638,39 @@ class _PhotoUploadScreenState extends State<PhotoUploadScreen> {
         ),
       ),
     );
+  }
+
+  /// Initialize push notifications after successful login
+  void _initializePushNotifications() {
+    try {
+      if (kDebugMode) {
+        print('🔔 Initializing push notifications after login...');
+      }
+      
+      final pushManager = PushNotificationManager();
+      
+      // Initialize push notifications (fire-and-forget - don't block navigation)
+      pushManager.initializeForUser().then((success) {
+        if (success) {
+          if (kDebugMode) {
+            print('✅ Push notifications initialized successfully');
+          }
+        } else {
+          if (kDebugMode) {
+            print('⚠️ Push notifications failed to initialize (non-blocking)');
+          }
+        }
+      }).catchError((e) {
+        if (kDebugMode) {
+          print('❌ Error initializing push notifications: $e');
+        }
+        // Don't block app if push notifications fail
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Exception in push notification initialization: $e');
+      }
+      // Don't block navigation if push notifications fail
+    }
   }
 }

@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:get/get.dart';
 import 'package:text_code/Reusable/ticker_payment_screen.dart';
 import 'package:text_code/Host_Pages/Controller_files/event_cntroller.dart';
-import 'package:text_code/login-signup/sign_up/booked_ticket.dart';
 import 'package:text_code/Home_pages/Controller/ticket_controller.dart';
 import 'package:text_code/Home_pages/Controller/home_page.dart';
 import 'package:text_code/Home_pages/UI_Design/home_with_tabs.dart';

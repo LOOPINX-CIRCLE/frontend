@@ -23,6 +23,7 @@ class Event {
   final bool isPublic;
   final bool isActive;
   final List<EventInterest> eventInterests;
+  final String? payoutStatus; // Payout status: pending, approved, processing, completed, rejected, cancelled, or null
 
   Event({
     required this.id,
@@ -45,6 +46,7 @@ class Event {
     required this.isPublic,
     required this.isActive,
     required this.eventInterests,
+    this.payoutStatus,
   });
 
   /// Creates an Event from JSON
@@ -87,6 +89,7 @@ class Event {
               ?.map((e) => EventInterest.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      payoutStatus: json['payout_status'] as String?,
     );
   }
 
@@ -113,6 +116,7 @@ class Event {
       'is_public': isPublic,
       'is_active': isActive,
       'event_interests': eventInterests.map((e) => e.toJson()).toList(),
+      'payout_status': payoutStatus,
     };
   }
 

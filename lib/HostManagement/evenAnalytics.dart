@@ -9,6 +9,7 @@ class EventAnalyticsScreen {
     required String eventPrice,
     required bool isCheckInActive, // Whether start check-in is active
     required String eventStatus, // Event status to control bank account button
+    String? payoutStatus, // Payout status for showing payout state
     VoidCallback? onRefreshCounts, // Callback to refresh counts in parent
   }) {
     showModalBottomSheet(
@@ -20,6 +21,7 @@ class EventAnalyticsScreen {
         eventPrice: eventPrice,
         isCheckInActive: isCheckInActive,
         eventStatus: eventStatus,
+        payoutStatus: payoutStatus,
         onRefreshCounts: onRefreshCounts,
       ),
     );
@@ -31,6 +33,7 @@ class _EventAnalyticsContent extends StatelessWidget {
   final String eventPrice;
   final bool isCheckInActive;
   final String eventStatus;
+  final String? payoutStatus;
   final VoidCallback? onRefreshCounts;
 
   const _EventAnalyticsContent({
@@ -38,6 +41,7 @@ class _EventAnalyticsContent extends StatelessWidget {
     required this.eventPrice,
     required this.isCheckInActive,
     required this.eventStatus,
+    this.payoutStatus,
     this.onRefreshCounts,
   });
 
@@ -142,9 +146,9 @@ class _EventAnalyticsContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 33),
-          // Add bank account button - show active if completed, locked if not
+          // Add bank account button - show active if completed AND paid event, locked if not
           GestureDetector(
-            onTap: eventStatus.toLowerCase() == 'completed'
+            onTap: (eventStatus.toLowerCase() == 'completed' && ticketPrice > 0 && (payoutStatus == null || payoutStatus!.isEmpty))
                 ? () async {
                     final selectedBank = await Navigator.push(
                       context,
@@ -157,39 +161,123 @@ class _EventAnalyticsContent extends StatelessWidget {
                       onRefreshCounts?.call();
                     }
                   }
-                : null, // No action if not completed
-            child: eventStatus.toLowerCase() == 'completed'
-                ? Image.asset(
-                    'assets/images/button (3).png', // Active button
-                    height: 52,
-                  )
-                : Container(
-                    height: 52,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      color: const Color(0xFF3A3A3A),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.lock,
-                          color: Color(0xFF999999),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Add bank account',
-                          style: GoogleFonts.poppins(
-                            color: const Color(0xFF999999),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                : null, // No action if not completed or free event or payout exists
+            child: _buildPayoutButton(_parsePrice(eventPrice)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build the appropriate payout button based on status
+  Widget _buildPayoutButton(double ticketPrice) {
+    // Check if payout exists
+    if (payoutStatus != null && payoutStatus!.isNotEmpty) {
+      return _buildPayoutStatusButton();
+    }
+
+    // Check if button should be unlocked
+    final isUnlocked = eventStatus.toLowerCase() == 'completed' && ticketPrice > 0;
+    
+    if (isUnlocked) {
+      return Image.asset(
+        'assets/images/button (3).png', // Active button
+        height: 52,
+      );
+    } else {
+      return Container(
+        height: 52,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: const Color(0xFF3A3A3A),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.lock,
+              color: Color(0xFF999999),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Add bank account',
+              style: GoogleFonts.poppins(
+                color: const Color(0xFF999999),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  /// Build payout status button
+  Widget _buildPayoutStatusButton() {
+    final status = payoutStatus?.toLowerCase() ?? '';
+    
+    late String buttonText;
+    late Color backgroundColor;
+    late Color textColor;
+    late IconData? iconData;
+
+    switch (status) {
+      case 'pending':
+      case 'approved':
+      case 'processing':
+        buttonText = 'Payout Processing';
+        backgroundColor = const Color(0xFFF59E0B); // Amber for processing
+        textColor = Colors.white;
+        iconData = Icons.hourglass_bottom;
+        break;
+      case 'completed':
+        buttonText = 'Payout Successful ✓';
+        backgroundColor = const Color(0xFF10B981); // Green for success
+        textColor = Colors.white;
+        iconData = Icons.check_circle;
+        break;
+      case 'rejected':
+      case 'cancelled':
+        buttonText = status == 'rejected' ? 'Rejected ✗' : 'Cancelled';
+        backgroundColor = const Color(0xFFEF4444); // Red for error
+        textColor = Colors.white;
+        iconData = Icons.cancel;
+        break;
+      default:
+        buttonText = 'Payout Status';
+        backgroundColor = const Color(0xFF6366F1); // Indigo default
+        textColor = Colors.white;
+        iconData = null;
+    }
+
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: backgroundColor,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (iconData != null) ...[
+            Icon(
+              iconData,
+              color: textColor,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            buttonText,
+            style: GoogleFonts.poppins(
+              color: textColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
