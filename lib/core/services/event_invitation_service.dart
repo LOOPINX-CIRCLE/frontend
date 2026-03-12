@@ -93,6 +93,108 @@ class EventInvitationService {
       );
     }
   }
+
+  /// Respond to an event invitation (going or declined).
+  ///
+  /// PUT /api/events/invitations/{inviteId}/respond
+  /// response: "going" or "declined"
+  Future<Map<String, dynamic>> respondToInvitation({
+    required int inviteId,
+    required String response, // "going" or "declined"
+    String? message,
+  }) async {
+    try {
+      final token = await _secureStorage.getToken();
+      if (token == null || token.isEmpty) {
+        throw ApiException(
+          message: 'Authentication token not found',
+          statusCode: 401,
+        );
+      }
+
+      final url = Uri.parse('${ApiConstants.baseUrl}/api/events/invitations/$inviteId/respond');
+      final headers = <String, String>{
+        'Authorization': 'Bearer $token',
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+
+      final body = jsonEncode({
+        'response': response,
+        'message': message ?? '',
+      });
+
+      if (kDebugMode) {
+        print('Responding to invitation: $url');
+        print('Request body: $body');
+      }
+
+      final httpResponse = await http.put(
+        url,
+        headers: headers,
+        body: body,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw ApiException(
+          message: 'Request timed out. Please check your connection and try again.',
+          statusCode: 408,
+        ),
+      );
+
+      if (kDebugMode) {
+        print('Respond invitation response status: ${httpResponse.statusCode}');
+        print('Respond invitation response body: ${httpResponse.body}');
+      }
+
+      if (httpResponse.statusCode == 200 || httpResponse.statusCode == 204) {
+        if (httpResponse.body.isNotEmpty) {
+          return jsonDecode(httpResponse.body) as Map<String, dynamic>;
+        }
+        return {'success': true};
+      }
+
+      if (httpResponse.statusCode == 401) {
+        throw ApiException(
+          message: 'Authentication failed. Please log in again.',
+          statusCode: 401,
+        );
+      }
+
+      if (httpResponse.statusCode == 404) {
+        throw ApiException(
+          message: 'Invitation not found',
+          statusCode: 404,
+        );
+      }
+
+      if (httpResponse.statusCode >= 500) {
+        throw ApiException(
+          message: 'Server error while responding to invitation. Please try again later.',
+          statusCode: httpResponse.statusCode,
+        );
+      }
+
+      final responseBody = httpResponse.body.isNotEmpty ? jsonDecode(httpResponse.body) : {};
+      final errorMessage = responseBody['detail']?.toString() ?? 
+                     responseBody['message']?.toString() ?? 
+                     'Failed to respond to invitation: ${httpResponse.statusCode}';
+      
+      throw ApiException(
+        message: errorMessage,
+        statusCode: httpResponse.statusCode,
+      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Unexpected error responding to invitation: $e');
+      }
+      throw ApiException(
+        message: 'Unexpected error responding to invitation: $e',
+        statusCode: 500,
+      );
+    }
+  }
 }
 
 

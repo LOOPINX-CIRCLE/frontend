@@ -238,7 +238,8 @@ class _BookedTicketState extends State<BookedTicket> {
                 ? formattedDate
                 : '';
 
-        // Create UserTicket object
+        // Create UserTicket object (include eventId so Home page can
+        // mark these events as "You're going" with View ticket button).
         final ticket = UserTicket(
           title: eventTitle,
           date: dateTimeString,
@@ -247,6 +248,7 @@ class _BookedTicketState extends State<BookedTicket> {
           eventImage: coverImageUrl.isNotEmpty
               ? coverImageUrl
               : "assets/images/image (1).png",
+          eventId: eventId,
         );
 
         // Add to controller
@@ -567,7 +569,11 @@ class TicketCard extends StatelessWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Image.asset('assets/images/key.png', width: 14),
+                          const Icon(
+                            Icons.vpn_key_outlined,
+                            size: 14,
+                            color: Colors.white70,
+                          ),
                           const SizedBox(width: 4),
                           const Text(
                             "Secret Code ",

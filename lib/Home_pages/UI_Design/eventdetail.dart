@@ -20,6 +20,7 @@ import 'package:text_code/Home_pages/Controller/home_page.dart';
 import 'package:text_code/Home_pages/UI_Design/home_with_tabs.dart';
 import 'package:text_code/core/models/event_invitation.dart';
 import 'package:text_code/core/models/event_request.dart';
+import 'package:text_code/core/services/event_invitation_service.dart';
 
 
 class EventDetail extends StatefulWidget {
@@ -71,6 +72,7 @@ class _EventDetailState extends State<EventDetail> {
   bool isConfirmingAttendance = false; // Track if we're confirming attendance
   EventRequest? requestStatus; // Store request status from API
   final EventRequestService _eventRequestService = EventRequestService();
+  final EventInvitationService _invitationService = EventInvitationService();
   EventInvitation? _eventInvitation; // Matching invitation, if any
   
   @override
@@ -472,6 +474,334 @@ class _EventDetailState extends State<EventDetail> {
     );
   }
 
+
+  /// Respond to invitation and handle next steps based on response
+  Future<void> _respondToInvitationAndProceed(String response) async {
+    if (_eventInvitation == null || widget.eventId == null) {
+      if (kDebugMode) {
+        print('Invitation or event ID is null, cannot respond');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invitation or event ID not available'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isConfirmingAttendance = true;
+    });
+
+    try {
+      if (kDebugMode) {
+        print('Responding to invitation ${_eventInvitation!.inviteId} with response: $response');
+      }
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+
+      // Respond to invitation
+      final responseData = await _invitationService.respondToInvitation(
+        inviteId: _eventInvitation!.inviteId,
+        response: response,
+        message: response == 'going' ? 'I will attend this event!' : 'I cannot attend this event.',
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (kDebugMode) {
+        print('Invitation response: $responseData');
+      }
+
+      // Update local invitation status
+      try {
+        if (Get.isRegistered<HomePageController>()) {
+          Get.find<HomePageController>()
+              .updateInvitationStatusForEvent(widget.eventId!, response == 'going' ? 'accepted' : 'declined');
+        }
+      } catch (_) {}
+
+      // Update _eventInvitation status locally
+      setState(() {
+        _eventInvitation = _eventInvitation!.copyWith(
+          status: response == 'going' ? 'accepted' : 'declined',
+        );
+        isConfirmingAttendance = false;
+      });
+
+      if (response == 'declined') {
+        // For declined invitations, just show a message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invitation declined'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      // For "going" response, check if payment or confirmation is needed
+      final isPaid = responseData['is_paid'] as bool? ?? false;
+      final requiresPayment = responseData['requires_payment'] as bool? ?? false;
+      final requiresConfirmation = responseData['requires_confirmation'] as bool? ?? false;
+
+      if (kDebugMode) {
+        print('Response details: isPaid=$isPaid, requiresPayment=$requiresPayment, requiresConfirmation=$requiresConfirmation');
+      }
+
+      if (requiresPayment || isPaid) {
+        // Navigate to payment flow
+        final eventController = Get.find<EventController>();
+        eventController.eventTitle.value = widget.title;
+        eventController.loaction.value = widget.venue;
+        eventController.date.value = widget.date;
+        eventController.time.value = widget.time;
+        eventController.eventImage.value = widget.eventImage;
+        eventController.ticketPrice.value =
+            widget.price?.replaceAll('₹', '').trim() ?? '0';
+        if (widget.eventId != null) {
+          eventController.eventId.value = widget.eventId!;
+        }
+        Get.to(() => TicketPriceScreen());
+      } else if (requiresConfirmation) {
+        // For free events, confirm attendance to get ticket
+        await _confirmAttendanceForFreeEvent();
+      } else {
+        // Already confirmed, show success
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invitation accepted! 🎉'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      setState(() {
+        isConfirmingAttendance = false;
+      });
+
+      if (kDebugMode) {
+        print('Error responding to invitation: $e');
+        print('Error type: ${e.runtimeType}');
+      }
+
+      // Extract meaningful error message
+      String errorMessage = 'Failed to respond to invitation. Please try again.';
+      
+      if (e is ApiException) {
+        errorMessage = e.message;
+      } else {
+        final errorString = e.toString();
+        if (errorString.startsWith('ApiException: ')) {
+          errorMessage = errorString.substring('ApiException: '.length);
+        }
+      }
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Confirm attendance for an INVITED event
+  /// This endpoint accepts the invitation if status is pending, or confirms the ticket if already accepted
+  Future<void> _confirmAttendanceForInvitedEvent() async {
+    if (widget.eventId == null) {
+      if (kDebugMode) {
+        print('Event ID is null, cannot confirm attendance');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Event ID not available'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    if (_eventInvitation == null) {
+      if (kDebugMode) {
+        print('No invitation found for this event');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invitation not found'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isConfirmingAttendance = true;
+    });
+
+    try {
+      final invitationStatus = (_eventInvitation?.status ?? '').toLowerCase();
+      if (kDebugMode) {
+        print('Confirming attendance for INVITED event ID: ${widget.eventId}');
+        print('Current invitation status: $invitationStatus');
+      }
+
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+
+      // Call confirm-attendance API
+      // This API will accept the invitation if status is pending,
+      // or confirm the ticket if status is already accepted
+      final ticketData = await _eventRequestService.confirmAttendance(
+        eventId: widget.eventId!,
+        seats: 1,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (kDebugMode) {
+        print('Attendance confirmed successfully for invited event');
+        print('Ticket ID: ${ticketData['ticket_id']}');
+        print('Ticket Secret: ${ticketData['ticket_secret']}');
+      }
+
+      // Update invitation status to accepted locally
+      try {
+        if (Get.isRegistered<HomePageController>()) {
+          Get.find<HomePageController>()
+              .updateInvitationStatusForEvent(widget.eventId!, 'accepted');
+        }
+      } catch (_) {}
+
+      // Update _eventInvitation status locally
+      setState(() {
+        _eventInvitation = _eventInvitation!.copyWith(status: 'accepted');
+        isConfirmingAttendance = false;
+      });
+
+      // Get ticket controller
+      final ticketController = Get.put(UserTicketController());
+      final eventController = Get.find<EventController>();
+
+      // Extract ticket secret code from API response
+      final ticketSecret = ticketData['ticket_secret']?.toString() ?? '';
+      
+      if (ticketSecret.isEmpty) {
+        throw Exception('Ticket secret code not found in API response');
+      }
+
+      // Create ticket with data from API
+      final ticket = UserTicket(
+        title: widget.title,
+        date: widget.date,
+        location: widget.venue,
+        code: ticketSecret,
+        eventImage: widget.eventImage.isNotEmpty
+            ? widget.eventImage
+            : "assets/images/image (1).png",
+        eventId: widget.eventId,
+      );
+
+      // Add ticket to controller
+      ticketController.addTicket(ticket);
+
+      // Update event controller
+      eventController.eventTitle.value = widget.title;
+      eventController.loaction.value = widget.venue;
+      eventController.date.value = widget.date;
+      eventController.time.value = widget.time;
+      eventController.eventImage.value = widget.eventImage;
+      eventController.ticketPrice.value = widget.price?.replaceAll('₹', '').trim() ?? "Free";
+      if (widget.eventId != null) {
+        eventController.eventId.value = widget.eventId!;
+      }
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Attendance confirmed! Ticket generated. 🎉'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Navigate to TicketScreen
+      if (mounted) {
+        Get.to(() => TicketScreen());
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      setState(() {
+        isConfirmingAttendance = false;
+      });
+
+      if (kDebugMode) {
+        print('Error confirming attendance for invited event: $e');
+        print('Error type: ${e.runtimeType}');
+      }
+
+      // Extract meaningful error message
+      String errorMessage = e.toString();
+      
+      // Remove "ApiException: " prefix if present
+      if (errorMessage.startsWith('ApiException: ')) {
+        errorMessage = errorMessage.substring('ApiException: '.length);
+      }
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   /// Confirm attendance for a FREE event after request acceptance
   /// This endpoint confirms attendance and generates ticket immediately
   /// CRITICAL: Only works for FREE events. Paid events must complete payment first.
@@ -490,14 +820,18 @@ class _EventDetailState extends State<EventDetail> {
       return;
     }
 
-    // Check if request is accepted
-    if (requestStatus == null || requestStatus?.status != 'accepted') {
+    // Check if request is accepted.
+    // For INVITED events (i.e. user has an EventInvitation), we skip this
+    // check and allow direct confirmation of attendance.
+    if (_eventInvitation == null &&
+        (requestStatus == null || requestStatus?.status != 'accepted')) {
       if (kDebugMode) {
         print('Request not accepted yet. Status: ${requestStatus?.status}');
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Your request must be accepted before confirming attendance.'),
+          content: Text(
+              'Your request must be accepted before confirming attendance.'),
           backgroundColor: Colors.orange,
           duration: Duration(seconds: 3),
         ),
@@ -555,7 +889,8 @@ class _EventDetailState extends State<EventDetail> {
         throw Exception('Ticket secret code not found in API response');
       }
 
-      // Create ticket with data from API
+      // Create ticket with data from API (include eventId so Home page
+      // can mark this event as "You're going" with View ticket button).
       final ticket = UserTicket(
         title: widget.title,
         date: widget.date,
@@ -564,6 +899,7 @@ class _EventDetailState extends State<EventDetail> {
         eventImage: widget.eventImage.isNotEmpty
             ? widget.eventImage
             : "assets/images/image (1).png",
+        eventId: widget.eventId,
       );
 
       // Add ticket to controller
@@ -809,7 +1145,11 @@ class _EventDetailState extends State<EventDetail> {
     
     // Handle invitation-based UI first
     if (hasInvitation) {
-      // Pending invitation -> show Going / Not Going buttons (same layout as accepted request)
+      // Pending invitation -> show Going / Not Going buttons
+      // Clicking "Going" MUST:
+      //  1) Call /api/events/invitations/{inviteId}/respond with response: "going"
+      //  2) Based on API response flags (requires_payment / requires_confirmation),
+      //     automatically call /api/events/{event_id}/confirm-attendance when needed.
       if (invitationStatus == 'pending') {
         return Padding(
           padding: const EdgeInsets.all(8),
@@ -823,23 +1163,15 @@ class _EventDetailState extends State<EventDetail> {
                     label: widget.price != null
                         ? "Going! ₹${widget.price}"
                         : "Going!",
-                    onPressed: () {
-                      // For paid events: go to payment; for free: confirm attendance.
-                      if (widget.price != null) {
-                        final eventController = Get.find<EventController>();
-                        eventController.eventTitle.value = widget.title;
-                        eventController.loaction.value = widget.venue;
-                        eventController.date.value = widget.date;
-                        eventController.time.value = widget.time;
-                        eventController.eventImage.value = widget.eventImage;
-                        eventController.ticketPrice.value =
-                            widget.price!.replaceAll('₹', '').trim();
-                        if (widget.eventId != null) {
-                          eventController.eventId.value = widget.eventId!;
-                        }
-                        Get.to(() => TicketPriceScreen());
-                      } else {
-                        _confirmAttendanceForFreeEvent();
+                    onPressed: () async {
+                      // Step 1: Accept invitation via
+                      //   PUT /api/events/invitations/{inviteId}/respond
+                      //   { "response": "going" }
+                      // Step 2: Inside _respondToInvitationAndProceed, if
+                      //   requires_confirmation == true, automatically call
+                      //   /api/events/{event_id}/confirm-attendance to generate ticket.
+                      if (_eventInvitation != null && invitationStatus == 'pending') {
+                        await _respondToInvitationAndProceed('going');
                       }
                     },
                   ),
@@ -853,15 +1185,11 @@ class _EventDetailState extends State<EventDetail> {
                     borderColor: Colors.white.withOpacity(0.35),
                     borderWidth: 1.0,
                     textColor: Colors.white,
-                    onPressed: () {
-                      final eventController = Get.find<EventController>();
-                      eventController.eventTitle.value = widget.title;
-                      eventController.loaction.value = widget.venue;
-                      eventController.date.value = widget.date;
-                      eventController.time.value = widget.time;
-                      eventController.eventImage.value = widget.eventImage;
-                      eventController.ticketPrice.value = "Free";
-                      Get.to(() => TicketScreen());
+                    onPressed: () async {
+                      // Decline invitation
+                      if (_eventInvitation != null) {
+                        await _respondToInvitationAndProceed('declined');
+                      }
                     },
                   ),
                 ),
@@ -871,8 +1199,21 @@ class _EventDetailState extends State<EventDetail> {
         );
       }
 
-      // Accepted/going invitation -> show View Ticket
+      // Accepted invitation -> check if ticket exists
+      // If ticket exists, show View Ticket; otherwise show Going/Not Going buttons
       if (invitationStatus == 'accepted' || invitationStatus == 'going') {
+        // Check if user has a ticket for this event
+        bool hasTicket = false;
+        try {
+          final ticketController = Get.find<UserTicketController>();
+          hasTicket = ticketController.tickets.any((ticket) => ticket.eventId == widget.eventId);
+        } catch (_) {
+          // UserTicketController not found or no tickets
+          hasTicket = false;
+        }
+
+        if (hasTicket) {
+          // Ticket exists -> show View Ticket button
         return Padding(
           padding: const EdgeInsets.all(8),
           child: SizedBox(
@@ -894,6 +1235,50 @@ class _EventDetailState extends State<EventDetail> {
             ),
           ),
         );
+        } else {
+          // No ticket yet -> show Going/Not Going buttons
+          return Padding(
+            padding: const EdgeInsets.all(8),
+            child: SizedBox(
+              width: screenWidth - 16,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: LoopinCtaButton(
+                      width: double.infinity,
+                      label: widget.price != null
+                          ? "Going! ₹${widget.price}"
+                          : "Going!",
+                      onPressed: () async {
+                        // For invited events, call confirm-attendance API directly
+                        if (_eventInvitation != null) {
+                          await _confirmAttendanceForInvitedEvent();
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: LoopinCtaButton(
+                      width: double.infinity,
+                      label: "Not Going",
+                      backgroundColor: Colors.transparent,
+                      borderColor: Colors.white.withOpacity(0.35),
+                      borderWidth: 1.0,
+                      textColor: Colors.white,
+                      onPressed: () async {
+                        // Decline invitation
+                        if (_eventInvitation != null) {
+                          await _respondToInvitationAndProceed('declined');
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
       }
 
       // Declined / expired invitation -> show a disabled status pill, no actions
@@ -1036,15 +1421,14 @@ class _EventDetailState extends State<EventDetail> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- Hosted By section (unchanged) ---
+          // Hosted By section ONLY
             Container(
               padding: const EdgeInsets.all(5),
               child: _buildInfoRow(
                 "Hosted By",
                 Container(
-                  width: 148,
                   height: 40,
-                  padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
                     color: const Color.fromRGBO(205, 191, 182, 0.10),
@@ -1052,11 +1436,20 @@ class _EventDetailState extends State<EventDetail> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                    // Host icon: first letter (V for Vaishnavi, R for Rahul, etc.)
                       CircleAvatar(
                         radius: 14,
-                        backgroundImage: const AssetImage('assets/images/host.png'),
-                        onBackgroundImageError: (exception, stackTrace) {},
-                        child: Image.asset('assets/images/host.png', fit: BoxFit.cover),
+                      backgroundColor: const Color.fromRGBO(205, 191, 182, 0.25),
+                      child: Text(
+                        widget.hostName.isNotEmpty
+                            ? widget.hostName[0].toUpperCase()
+                            : 'H',
+                        style: GoogleFonts.bricolageGrotesque(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
                       ),
                       const SizedBox(width: 8),
                       Flexible(
@@ -1073,46 +1466,13 @@ class _EventDetailState extends State<EventDetail> {
                     ],
                   ),
                 ),
-              ),
-            ),
-
-            // --- Separator Line ---
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 2),
-              child: Divider(color: Colors.white24, thickness: 1, height: 1),
-            ),
-
-            Container(
-              padding: const EdgeInsets.all(3),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "People Going (24 People)",
-                    style: GoogleFonts.bricolageGrotesque(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  // Avatar image - enlarged and shifted left to fit in container
-                  Transform.translate(
-                    offset: const Offset(-20, 0), // Shift left to fit in container
-                    child: Transform.scale(
-                      scale: 2, // make it larger
-                      
                     ),
                   ),
                 ],
-              ),
-            ),
-
-          ]
         ),
       ),
     );
   }
-
 
 Widget _buildVenueSection(double screenWidth) {
   return Padding(
@@ -1225,13 +1585,14 @@ Widget _buildVenueSection(double screenWidth) {
                   ),
                   const SizedBox(height: 2),
 
-                  // Address text
+                  // Address text (max 2 lines with ellipsis)
                   Text(
                     widget.fullAddress,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.bricolageGrotesque(
                       fontSize: 12,
                       color: Colors.white70,
-                      
                     ),
                   ),
 
